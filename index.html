@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>陀螺仪 & 加速度计</title>
+<title>运动传感器</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -105,7 +105,6 @@
     text-align: right;
   }
 
-  /* 3D visualization */
   .cube-container {
     width: 100%;
     max-width: 400px;
@@ -152,7 +151,7 @@
 </head>
 <body>
 
-<h1>📱 陀螺仪 & 加速度计</h1>
+<h1>📱 运动传感器</h1>
 
 <button id="startBtn" onclick="requestPermission()">点击开启传感器</button>
 
@@ -167,27 +166,7 @@
   </div>
 </div>
 
-<!-- 加速度 (含重力) -->
-<div class="section">
-  <div class="section-title">加速度（含重力）m/s²</div>
-  <div class="row">
-    <span class="label x">X</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar x" id="agxBar"></div></div>
-    <span class="value" id="agx">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label y">Y</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar y" id="agyBar"></div></div>
-    <span class="value" id="agy">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label z">Z</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar z" id="agzBar"></div></div>
-    <span class="value" id="agz">0.00</span>
-  </div>
-</div>
-
-<!-- 用户加速度 (不含重力) -->
+<!-- 用户加速度 -->
 <div class="section">
   <div class="section-title">用户加速度（不含重力）m/s²</div>
   <div class="row">
@@ -269,14 +248,6 @@ function fmt(v) {
 }
 
 function handleMotion(e) {
-  const ag = e.accelerationIncludingGravity || {};
-  document.getElementById('agx').textContent = fmt(ag.x);
-  document.getElementById('agy').textContent = fmt(ag.y);
-  document.getElementById('agz').textContent = fmt(ag.z);
-  updateBar('agxBar', ag.x || 0, 20);
-  updateBar('agyBar', ag.y || 0, 20);
-  updateBar('agzBar', ag.z || 0, 20);
-
   const a = e.acceleration || {};
   document.getElementById('ax').textContent = fmt(a.x);
   document.getElementById('ay').textContent = fmt(a.y);
@@ -318,7 +289,6 @@ function startListeners() {
 }
 
 function requestPermission() {
-  // iOS 13+ requires explicit permission
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
     DeviceMotionEvent.requestPermission()
       .then(state => {
@@ -334,7 +304,6 @@ function requestPermission() {
         document.getElementById('status').textContent = '❌ 请求权限失败: ' + err.message;
       });
   } else {
-    // Android / 桌面浏览器直接监听
     startListeners();
   }
 }
