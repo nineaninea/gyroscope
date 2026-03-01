@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Yaw Rotation Viewer</title>
+<title>Yaw Angle Chart</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -15,105 +15,25 @@
   h1 { font-size: 1.3rem; margin-bottom: 4px; color: #7eb8ff; text-align: center; }
   .subtitle { font-size: 0.72rem; color: #666; margin-bottom: 14px; text-align: center; }
 
+  .controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center; }
   .btn {
-    border: none; padding: 14px 36px; border-radius: 12px; font-size: 1rem;
+    border: none; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;
     font-weight: 600; cursor: pointer; color: white; transition: transform 0.15s, opacity 0.2s;
-    margin-bottom: 16px;
   }
   .btn:active { transform: scale(0.96); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
-  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); font-size: 0.85rem; padding: 10px 24px; }
-  .controls { display: flex; gap: 10px; margin-bottom: 14px; }
+  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
 
-  /* Panoramic strip */
-  .pano-wrapper {
-    width: 100%; max-width: 440px; height: 200px;
-    border-radius: 16px; overflow: hidden;
-    border: 1px solid #1e1e40; margin-bottom: 16px;
-    position: relative; background: #0d0d24;
+  .chart-container {
+    width: 100%; max-width: 460px; height: 300px;
+    background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
+    position: relative; overflow: hidden; margin-bottom: 14px;
   }
-  .pano-strip {
-    position: absolute; top: 0; left: 0;
-    height: 100%; display: flex;
-    transition: transform 0.08s ease-out;
-    will-change: transform;
-  }
-  .pano-segment {
-    height: 100%; flex-shrink: 0;
-    display: flex; flex-direction: column;
-    justify-content: flex-end; align-items: center;
-    padding-bottom: 12px; position: relative;
-  }
-  .pano-segment .deg-label {
-    font-size: 0.7rem; color: rgba(255,255,255,0.4);
-    font-weight: 600; position: absolute; bottom: 6px;
-  }
-  .pano-segment .dir-label {
-    font-size: 1rem; font-weight: 700; position: absolute; bottom: 22px;
-  }
-  .pano-segment .tick {
-    position: absolute; top: 0; left: 50%; width: 1px;
-    background: rgba(255,255,255,0.1); transform: translateX(-50%);
-  }
-  .pano-segment .tick.major { background: rgba(255,255,255,0.25); width: 2px; }
+  canvas { width: 100%; height: 100%; display: block; }
 
-  /* Center indicator */
-  .pano-indicator {
-    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-    width: 3px; height: 100%; background: #ff6b6b;
-    z-index: 10; pointer-events: none;
-  }
-  .pano-indicator::after {
-    content: '▼'; position: absolute; top: -2px; left: 50%;
-    transform: translateX(-50%); color: #ff6b6b; font-size: 14px;
-  }
-
-  /* Compass dial */
-  .compass-container {
-    width: 220px; height: 220px; position: relative;
-    margin-bottom: 16px;
-  }
-  .compass-ring {
-    width: 100%; height: 100%; border-radius: 50%;
-    border: 2px solid #1e1e40; background: #0d0d24;
-    position: relative;
-    transition: transform 0.08s ease-out;
-    will-change: transform;
-  }
-  .compass-label {
-    position: absolute; font-weight: 700; font-size: 0.85rem;
-    transform: translate(-50%, -50%);
-  }
-  .compass-tick {
-    position: absolute; top: 50%; left: 50%;
-    transform-origin: 0 0;
-    width: 1px; background: rgba(255,255,255,0.15);
-  }
-  .compass-tick.major { background: rgba(255,255,255,0.3); width: 2px; }
-  .compass-needle {
-    position: absolute; top: 50%; left: 50%;
-    width: 3px; height: 90px; background: #ff6b6b;
-    transform: translate(-50%, -100%);
-    border-radius: 2px;
-    z-index: 5;
-  }
-  .compass-needle::after {
-    content: ''; position: absolute; bottom: -6px; left: 50%;
-    transform: translateX(-50%);
-    width: 10px; height: 10px; border-radius: 50%;
-    background: #ff6b6b;
-  }
-  .compass-center {
-    position: absolute; top: 50%; left: 50%;
-    width: 12px; height: 12px; border-radius: 50%;
-    background: #222; border: 2px solid #555;
-    transform: translate(-50%, -50%); z-index: 6;
-  }
-
-  /* Info cards */
   .info-row {
-    width: 100%; max-width: 440px;
+    width: 100%; max-width: 460px;
     display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;
   }
   .info-card {
@@ -121,17 +41,15 @@
     border: 1px solid #1e1e40; text-align: center;
   }
   .info-label { font-size: 0.63rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-  .info-value { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #7eb8ff; }
-  .info-value.small { font-size: 1rem; color: #999; }
+  .info-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #7eb8ff; }
+  .info-value.sm { font-size: 0.95rem; color: #999; }
 
-  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 440px; line-height: 1.4; }
+  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 460px; line-height: 1.4; }
 
-  /* Calibration overlay */
   .cal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
-    justify-content: center; align-items: center; z-index: 100;
-    padding: 30px;
+    justify-content: center; align-items: center; z-index: 100; padding: 30px;
   }
   .cal-overlay.hidden { display: none; }
   .cal-icon { font-size: 3rem; margin-bottom: 16px; }
@@ -144,40 +62,30 @@
 </head>
 <body>
 
-<h1>🧭 Yaw Rotation Viewer</h1>
-<div class="subtitle">Rotation around gravity axis · Calibrated measurement</div>
+<h1>🧭 Yaw Angle Chart</h1>
+<div class="subtitle">Rotation around gravity axis · Scrolling over time</div>
 
 <div class="controls">
   <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
   <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Recalibrate</button>
 </div>
 
-<!-- Panoramic scrolling strip -->
-<div class="pano-wrapper" id="panoWrapper">
-  <div class="pano-indicator"></div>
-  <div class="pano-strip" id="panoStrip"></div>
+<div class="chart-container">
+  <canvas id="chart"></canvas>
 </div>
 
-<!-- Compass dial -->
-<div class="compass-container">
-  <div class="compass-ring" id="compassRing"></div>
-  <div class="compass-needle" id="compassNeedle" style="transform: translate(-50%, -100%) rotate(0deg);"></div>
-  <div class="compass-center"></div>
-</div>
-
-<!-- Info -->
 <div class="info-row">
   <div class="info-card">
-    <div class="info-label">Yaw Angle</div>
-    <div class="info-value" id="yawAngle">0.0°</div>
+    <div class="info-label">Current Angle</div>
+    <div class="info-value" id="curAngle">0.0°</div>
   </div>
   <div class="info-card">
-    <div class="info-label">Rotation Rate</div>
-    <div class="info-value small" id="yawRate">0.0 °/s</div>
+    <div class="info-label">Yaw Rate</div>
+    <div class="info-value sm" id="curRate">0.0 °/s</div>
   </div>
   <div class="info-card">
     <div class="info-label">|g| Check</div>
-    <div class="info-value small" id="gCheck">--</div>
+    <div class="info-value sm" id="gCheck">--</div>
   </div>
 </div>
 
@@ -187,214 +95,70 @@
 <div class="cal-overlay hidden" id="calOverlay">
   <div class="cal-icon">📐</div>
   <div class="cal-title">Calibrating Gravity Vector</div>
-  <div class="cal-desc">
-    Hold your phone still in any position for 3 seconds.<br>
-    The phone does NOT need to be level — just keep it steady.
-  </div>
+  <div class="cal-desc">Hold your phone still in any position for 3 seconds. It does NOT need to be level.</div>
   <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
   <div class="cal-status" id="calStatus">Collecting samples...</div>
 </div>
 
 <script>
 // ============ CONFIG ============
-const CAL_DURATION = 3000; // 3 seconds calibration
+const CAL_DURATION = 3000;
 const CAL_MIN_SAMPLES = 50;
-const GYRO_LP = 0.15; // low-pass for yaw rate display smoothing
-const PANO_DEG_PER_PX = 1.0; // 1 degree = 1 px width
+const SAMPLE_INTERVAL = 100; // ms, one data point every 0.1s
+const CHART_SECONDS = 15;    // how many seconds visible on chart
+const Y_RANGE_INIT = 45;     // initial ±degrees range for Y axis
+const Y_RANGE_MIN = 10;
+const GRAV_LP = 0.97;
 
 // ============ STATE ============
 let permissionGranted = false;
 let calibrated = false;
 let calibrating = false;
 
-// Calibration data
 let calStartTime = 0;
 let calAccelSamples = [];
 
-// Calibrated gravity unit vector in device frame
-let gUnitX = 0, gUnitY = 0, gUnitZ = -1; // default: phone flat, screen up
+// Gravity unit vector in device frame
+let gUnitX = 0, gUnitY = 0, gUnitZ = -1;
 
-// Yaw tracking via gyroscope integration
-// We integrate the component of rotationRate that is along the gravity axis
-let yawAngle = 0; // degrees, accumulated
-let yawRate = 0;   // current rate °/s (smoothed)
-let lastMotionTime = null;
-
-// For gravity vector continuous update (low-pass from accelerationIncludingGravity)
+// Continuous gravity LP
 let gravX = 0, gravY = 0, gravZ = -9.8;
 let gravInited = false;
-const GRAV_LP = 0.97;
 
-// Panoramic strip
-let panoWidth = 0;
-const TOTAL_DEG = 360;
+// Yaw
+let yawAngle = 0;
+let yawRate = 0;
+let lastMotionTime = null;
 
-// ============ BUILD UI ============
-function buildPanoStrip() {
-  const wrapper = document.getElementById('panoWrapper');
-  const wrapperWidth = wrapper.clientWidth;
-  const strip = document.getElementById('panoStrip');
-  strip.innerHTML = '';
+// Chart data: ring buffer of angle samples
+let data = [];        // array of {t, angle}
+let chartStartTime = 0;
+let sampleTimer = null;
 
-  // We render 3x 360° so we can wrap seamlessly
-  const degsPerSegment = 10;
-  const segWidth = degsPerSegment / PANO_DEG_PER_PX;
-  const totalSegs = (360 / degsPerSegment) * 3;
+// Canvas
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
 
-  const directions = {
-    0: { label: 'N', color: '#ff6b6b' },
-    45: { label: 'NE', color: '#aaa' },
-    90: { label: 'E', color: '#7eb8ff' },
-    135: { label: 'SE', color: '#aaa' },
-    180: { label: 'S', color: '#51cf66' },
-    225: { label: 'SW', color: '#aaa' },
-    270: { label: 'W', color: '#fcc419' },
-    315: { label: 'NW', color: '#aaa' },
-  };
-
-  // Colors for sky gradient per direction
-  const skyColors = {
-    0:   ['#1a0a2e', '#2d1b4e'], // N - deep purple
-    45:  ['#1a1a2e', '#2b2040'],
-    90:  ['#0a1628', '#1a3050'], // E - blue
-    135: ['#0a1a20', '#1a3040'],
-    180: ['#0a2018', '#1a4030'], // S - green tint
-    225: ['#1a1a10', '#302a18'],
-    270: ['#28180a', '#4a3018'], // W - warm
-    315: ['#201018', '#3a1a28'],
-  };
-
-  for (let i = 0; i < totalSegs; i++) {
-    const deg = (i * degsPerSegment) % 360;
-    const seg = document.createElement('div');
-    seg.className = 'pano-segment';
-    seg.style.width = segWidth + 'px';
-
-    // Background gradient based on direction
-    const nearest = Math.round(deg / 45) * 45 % 360;
-    const colors = skyColors[nearest] || ['#111', '#222'];
-    seg.style.background = `linear-gradient(to bottom, ${colors[0]}, ${colors[1]})`;
-
-    // Tick mark
-    const tick = document.createElement('div');
-    tick.className = 'tick';
-    const isMajor = deg % 30 === 0;
-    if (isMajor) tick.classList.add('major');
-    tick.style.height = isMajor ? '100%' : '40%';
-    seg.appendChild(tick);
-
-    // Degree label every 30°
-    if (deg % 30 === 0) {
-      const dl = document.createElement('div');
-      dl.className = 'deg-label';
-      dl.textContent = deg + '°';
-      seg.appendChild(dl);
-    }
-
-    // Direction label
-    if (directions[deg]) {
-      const dl = document.createElement('div');
-      dl.className = 'dir-label';
-      dl.style.color = directions[deg].color;
-      dl.textContent = directions[deg].label;
-      seg.appendChild(dl);
-
-      // Landmark silhouettes
-      if (deg === 0) { // N - mountain
-        seg.innerHTML += `<svg style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0.2" width="60" height="30"><polygon points="0,30 15,5 30,20 45,2 60,30" fill="#ff6b6b"/></svg>`;
-      } else if (deg === 90) { // E - building
-        seg.innerHTML += `<svg style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0.2" width="40" height="40"><rect x="5" y="0" width="12" height="40" fill="#7eb8ff"/><rect x="22" y="10" width="14" height="30" fill="#7eb8ff"/></svg>`;
-      } else if (deg === 180) { // S - tree
-        seg.innerHTML += `<svg style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0.2" width="40" height="40"><circle cx="20" cy="10" r="12" fill="#51cf66"/><rect x="18" y="20" width="4" height="20" fill="#51cf66"/></svg>`;
-      } else if (deg === 270) { // W - sun
-        seg.innerHTML += `<svg style="position:absolute;bottom:55px;left:50%;transform:translateX(-50%);opacity:0.2" width="36" height="36"><circle cx="18" cy="18" r="10" fill="none" stroke="#fcc419" stroke-width="2"/><circle cx="18" cy="18" r="5" fill="#fcc419"/></svg>`;
-      }
-    }
-
-    strip.appendChild(seg);
-  }
-
-  panoWidth = segWidth * (360 / degsPerSegment); // width of one 360° cycle
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawChart();
 }
+window.addEventListener('resize', resizeCanvas);
 
-function buildCompass() {
-  const ring = document.getElementById('compassRing');
-  ring.innerHTML = '';
-  const r = 108; // ring radius (half of 220 - border)
-  const dirs = [
-    { deg: 0, label: 'N', color: '#ff6b6b' },
-    { deg: 90, label: 'E', color: '#7eb8ff' },
-    { deg: 180, label: 'S', color: '#51cf66' },
-    { deg: 270, label: 'W', color: '#fcc419' },
-  ];
-
-  // Tick marks
-  for (let d = 0; d < 360; d += 10) {
-    const isMajor = d % 30 === 0;
-    const rad = d * Math.PI / 180;
-    const innerR = isMajor ? r - 18 : r - 10;
-    const outerR = r - 2;
-    const tick = document.createElement('div');
-    tick.className = 'compass-tick' + (isMajor ? ' major' : '');
-    tick.style.position = 'absolute';
-    tick.style.width = (isMajor ? 2 : 1) + 'px';
-    tick.style.height = (outerR - innerR) + 'px';
-    tick.style.left = '50%';
-    tick.style.top = '50%';
-    tick.style.transformOrigin = '50% 0';
-    tick.style.transform = `translate(-50%, 0) rotate(${d}deg) translateY(-${outerR}px)`;
-    tick.style.background = isMajor ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
-    ring.appendChild(tick);
-  }
-
-  // Direction labels
-  for (const dir of dirs) {
-    const rad = dir.deg * Math.PI / 180;
-    const labelR = r - 30;
-    const lbl = document.createElement('div');
-    lbl.className = 'compass-label';
-    lbl.style.color = dir.color;
-    lbl.style.left = (50 + (labelR / r) * 50 * Math.sin(rad)) + '%';
-    lbl.style.top = (50 - (labelR / r) * 50 * Math.cos(rad)) + '%';
-    lbl.textContent = dir.label;
-    ring.appendChild(lbl);
-  }
-}
-
-// ============ PANORAMIC UPDATE ============
-function updatePano(deg) {
-  const wrapper = document.getElementById('panoWrapper');
-  const wrapperWidth = wrapper.clientWidth;
-  const strip = document.getElementById('panoStrip');
-
-  // Normalize to 0-360
-  let d = ((deg % 360) + 360) % 360;
-
-  // Convert degrees to pixels, center the current degree
-  const px = (d / PANO_DEG_PER_PX);
-  // Offset by one full cycle so we're in the middle copy
-  const offset = panoWidth + px - wrapperWidth / 2;
-  strip.style.transform = `translateX(${-offset}px)`;
-}
-
-function updateCompass(deg) {
-  // Ring rotates opposite to show current heading at top
-  const ring = document.getElementById('compassRing');
-  ring.style.transform = `rotate(${-deg}deg)`;
-}
-
-// ============ SENSORS ============
+// ============ SENSOR ============
 function handleMotion(e) {
   const now = performance.now();
 
-  // Update gravity estimate from accelerationIncludingGravity
   const agx = e.accelerationIncludingGravity?.x || 0;
   const agy = e.accelerationIncludingGravity?.y || 0;
   const agz = e.accelerationIncludingGravity?.z || 0;
 
   if (!gravInited) {
-    gravX = agx; gravY = agy; gravZ = agz;
-    gravInited = true;
+    gravX = agx; gravY = agy; gravZ = agz; gravInited = true;
   } else {
     gravX = GRAV_LP * gravX + (1 - GRAV_LP) * agx;
     gravY = GRAV_LP * gravY + (1 - GRAV_LP) * agy;
@@ -404,42 +168,30 @@ function handleMotion(e) {
   const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
   document.getElementById('gCheck').textContent = gMag.toFixed(2);
 
-  // --- Calibration phase ---
+  // Calibration
   if (calibrating) {
     calAccelSamples.push({ x: agx, y: agy, z: agz });
     const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
     document.getElementById('calFill').style.width = progress + '%';
-    document.getElementById('calStatus').textContent =
-      `Collecting... ${calAccelSamples.length} samples`;
+    document.getElementById('calStatus').textContent = `Collecting... ${calAccelSamples.length} samples`;
     if (now - calStartTime >= CAL_DURATION) finishCalibration();
     return;
   }
 
   if (!calibrated) return;
 
-  // --- Yaw integration from gyroscope ---
+  // Gyro: project rotationRate onto gravity axis
   const rr = e.rotationRate;
   if (!rr) return;
 
-  // rotationRate is in °/s in device frame: alpha(Z), beta(X), gamma(Y)
-  // We need the component along the gravity axis
-  // rotationRate gives angular velocity around device axes:
-  //   rr.alpha = rotation around device Z axis (°/s)
-  //   rr.beta  = rotation around device X axis (°/s)
-  //   rr.gamma = rotation around device Y axis (°/s)
-  // Convert to rad/s vector in device frame
-  const wrx = (rr.beta  || 0); // around device X
-  const wry = (rr.gamma || 0); // around device Y
-  const wrz = (rr.alpha || 0); // around device Z
+  const wrx = rr.beta  || 0; // °/s around device X
+  const wry = rr.gamma || 0; // °/s around device Y
+  const wrz = rr.alpha || 0; // °/s around device Z
 
-  // Project onto gravity axis: yaw_rate = ω · ĝ (dot product)
-  // gUnit points along gravity in device frame
   const rawYawRate = wrx * gUnitX + wry * gUnitY + wrz * gUnitZ;
 
-  // Smooth for display
-  yawRate = yawRate * (1 - GYRO_LP) + rawYawRate * GYRO_LP;
+  yawRate = yawRate * 0.7 + rawYawRate * 0.3;
 
-  // Integrate
   if (lastMotionTime !== null) {
     const dt = (now - lastMotionTime) / 1000;
     if (dt > 0 && dt < 0.5) {
@@ -448,13 +200,204 @@ function handleMotion(e) {
   }
   lastMotionTime = now;
 
-  // Update UI
-  const displayDeg = ((yawAngle % 360) + 360) % 360;
-  document.getElementById('yawAngle').textContent = displayDeg.toFixed(1) + '°';
-  document.getElementById('yawRate').textContent = yawRate.toFixed(1) + ' °/s';
+  document.getElementById('curAngle').textContent = yawAngle.toFixed(1) + '°';
+  document.getElementById('curRate').textContent = yawRate.toFixed(1) + ' °/s';
+}
 
-  updatePano(displayDeg);
-  updateCompass(displayDeg);
+// ============ CHART SAMPLING ============
+function startSampling() {
+  chartStartTime = performance.now();
+  data = [];
+  sampleTimer = setInterval(() => {
+    const t = (performance.now() - chartStartTime) / 1000;
+    data.push({ t, angle: yawAngle });
+
+    // Keep only enough data for the visible window + a small buffer
+    const maxSamples = Math.ceil(CHART_SECONDS / (SAMPLE_INTERVAL / 1000)) + 20;
+    if (data.length > maxSamples) data.shift();
+
+    drawChart();
+  }, SAMPLE_INTERVAL);
+}
+
+function stopSampling() {
+  if (sampleTimer) { clearInterval(sampleTimer); sampleTimer = null; }
+}
+
+// ============ CHART DRAWING ============
+function drawChart() {
+  const w = canvas.width / dpr;
+  const h = canvas.height / dpr;
+  const pad = { top: 20, right: 16, bottom: 32, left: 50 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Determine Y range (auto-scale)
+  let maxAbs = Y_RANGE_INIT;
+  for (const d of data) {
+    const a = Math.abs(d.angle);
+    if (a > maxAbs) maxAbs = a;
+  }
+  // Round up to nice number
+  const yRange = Math.max(Y_RANGE_MIN, Math.ceil(maxAbs / 10) * 10 + 5);
+
+  // Time range: latest CHART_SECONDS
+  const now = data.length > 0 ? data[data.length - 1].t : 0;
+  const tMin = now - CHART_SECONDS;
+  const tMax = now;
+
+  // Helpers
+  function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
+  function yPos(angle) { return pad.top + ch / 2 - (angle / yRange) * (ch / 2); }
+
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+  grad.addColorStop(0, 'rgba(255,107,107,0.03)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(81,207,102,0.03)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(pad.left, pad.top, cw, ch);
+
+  // Grid lines - horizontal
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 0.5;
+  const yStep = yRange <= 30 ? 10 : yRange <= 90 ? 15 : yRange <= 180 ? 30 : 45;
+  for (let a = -yRange; a <= yRange; a += yStep) {
+    const y = yPos(a);
+    if (y < pad.top || y > pad.top + ch) continue;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+  }
+
+  // Zero line
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  const zeroY = yPos(0);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cw, zeroY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Grid lines - vertical (time)
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 0.5;
+  const tStep = CHART_SECONDS <= 10 ? 1 : CHART_SECONDS <= 30 ? 2 : 5;
+  const firstT = Math.ceil(tMin / tStep) * tStep;
+  for (let t = firstT; t <= tMax; t += tStep) {
+    const x = xPos(t);
+    if (x < pad.left || x > pad.left + cw) continue;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
+  }
+
+  // Y axis labels
+  ctx.fillStyle = '#555';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let a = -yRange; a <= yRange; a += yStep) {
+    const y = yPos(a);
+    if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
+    ctx.fillText(a + '°', pad.left - 6, y);
+  }
+
+  // X axis labels (time)
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let t = firstT; t <= tMax; t += tStep) {
+    const x = xPos(t);
+    if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
+    ctx.fillText(t.toFixed(0) + 's', x, pad.top + ch + 6);
+  }
+
+  // Axis titles
+  ctx.fillStyle = '#444';
+  ctx.font = '9px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Time', pad.left + cw / 2, h - 4);
+
+  ctx.save();
+  ctx.translate(10, pad.top + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Angle (°)', 0, 0);
+  ctx.restore();
+
+  // Draw data line
+  if (data.length < 2) return;
+
+  // Clip to chart area
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pad.left, pad.top, cw, ch);
+  ctx.clip();
+
+  // Filled area under curve
+  ctx.beginPath();
+  let started = false;
+  for (const d of data) {
+    if (d.t < tMin) continue;
+    const x = xPos(d.t);
+    const y = yPos(d.angle);
+    if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  if (started) {
+    const lastD = data[data.length - 1];
+    ctx.lineTo(xPos(lastD.t), zeroY);
+    ctx.closePath();
+    const fillGrad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+    fillGrad.addColorStop(0, 'rgba(126,184,255,0.15)');
+    fillGrad.addColorStop(0.5, 'rgba(126,184,255,0.02)');
+    fillGrad.addColorStop(1, 'rgba(126,184,255,0.15)');
+    ctx.fillStyle = fillGrad;
+    ctx.fill();
+  }
+
+  // Line
+  ctx.beginPath();
+  started = false;
+  for (const d of data) {
+    if (d.t < tMin) continue;
+    const x = xPos(d.t);
+    const y = yPos(d.angle);
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#7eb8ff';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Current point dot
+  if (data.length > 0) {
+    const last = data[data.length - 1];
+    const lx = xPos(last.t);
+    const ly = yPos(last.angle);
+
+    // Glow
+    const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 12);
+    glow.addColorStop(0, 'rgba(126,184,255,0.4)');
+    glow.addColorStop(1, 'rgba(126,184,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill();
+
+    // Dot
+    ctx.fillStyle = '#7eb8ff';
+    ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+
+    // Value label
+    ctx.fillStyle = '#bbb';
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(last.angle.toFixed(1) + '°', lx + 8, ly - 4);
+  }
+
+  ctx.restore();
+
+  // Border
+  ctx.strokeStyle = '#1e1e40';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pad.left, pad.top, cw, ch);
 }
 
 // ============ CALIBRATION ============
@@ -475,27 +418,22 @@ function finishCalibration() {
     return;
   }
 
-  // Average accelerationIncludingGravity during calibration = gravity vector
   let sx = 0, sy = 0, sz = 0;
   for (const s of calAccelSamples) { sx += s.x; sy += s.y; sz += s.z; }
   const n = calAccelSamples.length;
   const avgX = sx / n, avgY = sy / n, avgZ = sz / n;
+  const mag = Math.sqrt(avgX * avgX + avgY * avgY + avgZ * avgZ);
 
-  // Normalize to get gravity unit vector in device frame
-  const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
   if (mag < 5) {
-    document.getElementById('status').textContent = '❌ Gravity too weak. Were sensors active?';
+    document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
     return;
   }
 
   gUnitX = avgX / mag;
   gUnitY = avgY / mag;
   gUnitZ = avgZ / mag;
-
-  // Also seed the continuous gravity filter
   gravX = avgX; gravY = avgY; gravZ = avgZ;
 
-  // Reset yaw
   yawAngle = 0;
   yawRate = 0;
   lastMotionTime = null;
@@ -503,18 +441,21 @@ function finishCalibration() {
   calibrated = true;
   document.getElementById('resetBtn').style.display = '';
   document.getElementById('status').textContent =
-    `✅ Calibrated! Gravity vector: (${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)}). Rotate your phone!`;
+    `✅ Calibrated! g = (${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)}). Rotate your phone!`;
+
+  startSampling();
 }
 
 function recalibrate() {
+  stopSampling();
   calibrated = false;
   yawAngle = 0;
   yawRate = 0;
   lastMotionTime = null;
-  document.getElementById('yawAngle').textContent = '0.0°';
-  document.getElementById('yawRate').textContent = '0.0 °/s';
-  updatePano(0);
-  updateCompass(0);
+  data = [];
+  document.getElementById('curAngle').textContent = '0.0°';
+  document.getElementById('curRate').textContent = '0.0 °/s';
+  drawChart();
   startCalibration();
 }
 
@@ -526,9 +467,7 @@ function requestPermission() {
         if (state === 'granted') onPermGranted();
         else document.getElementById('status').textContent = '❌ Permission denied';
       })
-      .catch(err => {
-        document.getElementById('status').textContent = '❌ ' + err.message;
-      });
+      .catch(err => { document.getElementById('status').textContent = '❌ ' + err.message; });
   } else {
     onPermGranted();
   }
@@ -539,25 +478,12 @@ function onPermGranted() {
   window.addEventListener('devicemotion', handleMotion, true);
   document.getElementById('permBtn').disabled = true;
   document.getElementById('permBtn').textContent = '✅ Granted';
-
-  // Build UI
-  buildPanoStrip();
-  buildCompass();
-  updatePano(0);
-
-  // Start calibration immediately
   startCalibration();
 }
 
-// ============ INIT ============
-window.addEventListener('load', () => {
-  buildPanoStrip();
-  buildCompass();
-});
-window.addEventListener('resize', () => {
-  buildPanoStrip();
-  updatePano(((yawAngle % 360) + 360) % 360);
-});
+// Init
+resizeCanvas();
+drawChart();
 </script>
 </body>
 </html>
