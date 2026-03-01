@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>运动轨迹追踪</title>
+<title>运动轨迹追踪 v2</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -17,211 +17,213 @@
     padding: 16px;
     overflow-x: hidden;
   }
-  h1 {
-    font-size: 1.3rem;
-    margin-bottom: 12px;
-    color: #7eb8ff;
-    text-align: center;
-  }
+  h1 { font-size: 1.3rem; margin-bottom: 8px; color: #7eb8ff; text-align: center; }
+  .subtitle { font-size: 0.75rem; color: #666; margin-bottom: 12px; text-align: center; }
+
   .controls {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center;
   }
   .btn {
-    border: none;
-    padding: 12px 28px;
-    border-radius: 12px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
+    border: none; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;
+    font-weight: 600; cursor: pointer; color: white;
     transition: transform 0.15s, opacity 0.2s;
-    color: white;
   }
   .btn:active { transform: scale(0.96); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-start { background: linear-gradient(135deg, #51cf66, #37b24d); box-shadow: 0 4px 12px rgba(81,207,102,0.3); }
-  .btn-stop { background: linear-gradient(135deg, #ff6b6b, #e03131); box-shadow: 0 4px 12px rgba(255,107,107,0.3); }
-  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); box-shadow: 0 4px 12px rgba(134,142,150,0.3); }
-  .btn-permission { background: linear-gradient(135deg, #4a90d9, #357abd); box-shadow: 0 4px 15px rgba(74,144,217,0.4); }
-  .map-container {
-    width: 100%;
-    max-width: 420px;
-    aspect-ratio: 1;
-    background: #0d0d24;
-    border-radius: 16px;
+  .btn-start { background: linear-gradient(135deg, #51cf66, #37b24d); }
+  .btn-stop { background: linear-gradient(135deg, #ff6b6b, #e03131); }
+  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
+  .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
+
+  .mode-toggle {
+    width: 100%; max-width: 420px; display: flex; gap: 0;
+    margin-bottom: 14px; border-radius: 10px; overflow: hidden;
     border: 1px solid #1e1e40;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 14px;
-    touch-action: none;
+  }
+  .mode-btn {
+    flex: 1; padding: 10px; text-align: center; font-size: 0.8rem; font-weight: 600;
+    background: #12122a; color: #666; border: none; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .mode-btn.active { background: #1e3a5f; color: #7eb8ff; }
+
+  .map-container {
+    width: 100%; max-width: 420px; aspect-ratio: 1;
+    background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
+    position: relative; overflow: hidden; margin-bottom: 14px;
   }
   canvas { width: 100%; height: 100%; display: block; }
+
   .info-grid {
-    width: 100%;
-    max-width: 420px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 14px;
+    width: 100%; max-width: 420px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;
   }
   .info-card {
-    background: #12122a;
-    border-radius: 12px;
-    padding: 12px;
-    border: 1px solid #1e1e40;
-    text-align: center;
+    background: #12122a; border-radius: 10px; padding: 10px;
+    border: 1px solid #1e1e40; text-align: center;
   }
-  .info-card.full { grid-column: 1 / -1; }
-  .info-label {
-    font-size: 0.7rem;
-    color: #8888aa;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-  }
-  .info-value {
-    font-size: 1.15rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    color: #ccc;
-  }
-  .info-value.highlight { color: #7eb8ff; }
+  .info-card.span2 { grid-column: span 2; }
+  .info-label { font-size: 0.65rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .info-value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #ccc; }
+  .info-value.blue { color: #7eb8ff; }
   .info-value.green { color: #51cf66; }
   .info-value.red { color: #ff6b6b; }
+  .info-value.yellow { color: #fcc419; }
+
   .legend {
-    width: 100%;
-    max-width: 420px;
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    font-size: 0.75rem;
-    color: #666;
-    margin-bottom: 10px;
+    width: 100%; max-width: 420px; display: flex; justify-content: center;
+    gap: 16px; font-size: 0.72rem; color: #666; margin-bottom: 8px;
   }
   .legend span::before {
-    content: '';
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    margin-right: 4px;
-    vertical-align: middle;
+    content: ''; display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; margin-right: 4px; vertical-align: middle;
   }
   .legend .start::before { background: #51cf66; }
   .legend .end::before { background: #ff6b6b; }
   .legend .path::before { background: #4a90d9; }
+
   #status {
-    font-size: 0.8rem;
-    color: #666;
-    text-align: center;
-    margin-top: 4px;
-    max-width: 420px;
-    line-height: 1.4;
+    font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px;
+    max-width: 420px; line-height: 1.4;
   }
-  .warning {
-    width: 100%;
-    max-width: 420px;
-    background: #1a1a00;
-    border: 1px solid #444400;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 0.75rem;
-    color: #bbbb44;
-    margin-bottom: 14px;
-    line-height: 1.4;
-    text-align: center;
+
+  .calibrating {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
+    justify-content: center; align-items: center; border-radius: 16px;
+    z-index: 10;
   }
+  .calibrating.hidden { display: none; }
+  .cal-text { color: #fcc419; font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+  .cal-sub { color: #888; font-size: 0.8rem; }
+  .cal-bar { width: 60%; height: 6px; background: #222; border-radius: 3px; margin-top: 12px; overflow: hidden; }
+  .cal-fill { height: 100%; background: #fcc419; border-radius: 3px; transition: width 0.1s; width: 0%; }
 </style>
 </head>
 <body>
 
-<h1>🗺️ 运动轨迹追踪</h1>
-
-<div class="warning">
-  ⚠️ 加速度计二次积分存在累积漂移，轨迹仅供短距离参考（建议 &lt; 30秒）。
-</div>
+<h1>🗺️ 运动轨迹追踪 v2</h1>
+<div class="subtitle">步态检测 + 指南针航向推算</div>
 
 <div class="controls">
-  <button class="btn btn-permission" id="permBtn" onclick="requestPermission()">授权传感器</button>
-  <button class="btn btn-start" id="startBtn" onclick="startRecording()" disabled>▶ 开始记录</button>
-  <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>⏹ 停止记录</button>
+  <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">授权传感器</button>
+  <button class="btn btn-start" id="startBtn" onclick="startRecording()" disabled>▶ 开始</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>⏹ 停止</button>
   <button class="btn btn-reset" id="resetBtn" onclick="resetAll()">↻ 重置</button>
+</div>
+
+<div class="mode-toggle">
+  <button class="mode-btn active" id="modeStep" onclick="setMode('step')">步态模式（推荐）</button>
+  <button class="mode-btn" id="modeRaw" onclick="setMode('raw')">原始积分模式</button>
 </div>
 
 <div class="legend">
   <span class="start">起点</span>
   <span class="path">轨迹</span>
-  <span class="end">当前/终点</span>
+  <span class="end">当前</span>
 </div>
 
 <div class="map-container">
   <canvas id="mapCanvas"></canvas>
+  <div class="calibrating hidden" id="calOverlay">
+    <div class="cal-text">📐 校准中...</div>
+    <div class="cal-sub">请将手机静置 2 秒</div>
+    <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
+  </div>
 </div>
 
 <div class="info-grid">
   <div class="info-card">
-    <div class="info-label">总距离 (m)</div>
-    <div class="info-value highlight" id="totalDist">0.00</div>
+    <div class="info-label">步数</div>
+    <div class="info-value yellow" id="stepCount">0</div>
   </div>
   <div class="info-card">
-    <div class="info-label">记录时间 (s)</div>
+    <div class="info-label">距离 (m)</div>
+    <div class="info-value blue" id="totalDist">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">时间 (s)</div>
     <div class="info-value" id="totalTime">0.0</div>
   </div>
   <div class="info-card">
-    <div class="info-label">水平位移 X (m)</div>
+    <div class="info-label">位移 X (m)</div>
     <div class="info-value green" id="dispX">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">水平位移 Y (m)</div>
+    <div class="info-label">位移 Y (m)</div>
     <div class="info-value green" id="dispY">0.00</div>
   </div>
-  <div class="info-card full">
-    <div class="info-label">垂直高度变化 (m)</div>
+  <div class="info-card">
+    <div class="info-label">高度 Δ (m)</div>
     <div class="info-value red" id="dispZ">0.00</div>
   </div>
   <div class="info-card">
-    <div class="info-label">当前速度 (m/s)</div>
-    <div class="info-value" id="curSpeed">0.00</div>
+    <div class="info-label">航向 (°)</div>
+    <div class="info-value" id="heading">--</div>
   </div>
   <div class="info-card">
-    <div class="info-label">采样点数</div>
-    <div class="info-value" id="sampleCount">0</div>
+    <div class="info-label">步长 (m)</div>
+    <div class="info-value" id="stepLen">0.70</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">速度 (m/s)</div>
+    <div class="info-value" id="curSpeed">0.00</div>
   </div>
 </div>
 
 <div id="status">请先点击「授权传感器」</div>
 
 <script>
-// ===== State =====
-let recording = false;
-let permissionGranted = false;
-let lastTimestamp = null;
+// ============ CONFIG ============
+let MODE = 'step'; // 'step' or 'raw'
+const STEP_LENGTH = 0.70; // average step length in meters
+const STEP_THRESHOLD = 1.2; // accel magnitude threshold for step detection
+const STEP_COOLDOWN = 280; // min ms between steps
+const CAL_DURATION = 2000; // calibration time in ms
+const RAW_ACCEL_THRESHOLD = 0.15;
+const RAW_VELOCITY_DECAY = 0.985;
+const RAW_LOW_SAMPLES = 5;
 
-let posX = 0, posY = 0, posZ = 0;
-let velX = 0, velY = 0, velZ = 0;
+// ============ STATE ============
+let permissionGranted = false;
+let recording = false;
+let calibrating = false;
+let lastTimestamp = null;
+let startTime = 0;
+
+// Orientation
 let oriAlpha = 0, oriBeta = 0, oriGamma = 0;
 
-let path = [];
-let totalDistance = 0;
-let startTime = 0;
-let sampleCount = 0;
+// Step detection
+let stepCount = 0;
+let lastStepTime = 0;
+let prevAccelMag = 0;
+let accelRising = false;
 
+// Calibration
+let calStartTime = 0;
+let calSamples = [];
+let accelBias = { x: 0, y: 0, z: 0 };
+
+// Position
+let posX = 0, posY = 0, posZ = 0;
+let velX = 0, velY = 0, velZ = 0;
+let totalDistance = 0;
+let rawLowCount = 0;
+
+// Path
+let path = [];
+
+// Canvas
 const canvas = document.getElementById('mapCanvas');
 const ctx = canvas.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
-
-// Filters
-const ACCEL_THRESHOLD = 0.12;
-const VELOCITY_DECAY = 0.985;
-let lowAccelCount = 0;
-const LOW_ACCEL_SAMPLES = 5;
-
-// Throttle drawing to ~20fps
 let lastDrawTime = 0;
-const DRAW_INTERVAL = 50;
+
+// High-pass filter state for raw mode
+let hpX = 0, hpY = 0, hpZ = 0;
+let prevRawX = 0, prevRawY = 0, prevRawZ = 0;
+const HP_ALPHA = 0.8;
 
 function resizeCanvas() {
   const rect = canvas.parentElement.getBoundingClientRect();
@@ -232,213 +234,179 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
-// ===== Sensor Handlers =====
+// ============ MODE ============
+function setMode(m) {
+  MODE = m;
+  document.getElementById('modeStep').classList.toggle('active', m === 'step');
+  document.getElementById('modeRaw').classList.toggle('active', m === 'raw');
+}
+
+// ============ SENSORS ============
 function handleOrientation(e) {
   oriAlpha = e.alpha || 0;
   oriBeta = e.beta || 0;
   oriGamma = e.gamma || 0;
+  if (!recording) {
+    document.getElementById('heading').textContent = oriAlpha.toFixed(0);
+  }
 }
 
 function handleMotion(e) {
-  if (!recording) return;
-
   const now = performance.now();
+
+  // --- Calibration phase ---
+  if (calibrating) {
+    const ax = e.accelerationIncludingGravity.x || 0;
+    const ay = e.accelerationIncludingGravity.y || 0;
+    const az = e.accelerationIncludingGravity.z || 0;
+    calSamples.push({ x: ax, y: ay, z: az });
+    const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
+    document.getElementById('calFill').style.width = progress + '%';
+    if (now - calStartTime >= CAL_DURATION) {
+      finishCalibration();
+    }
+    return;
+  }
+
+  if (!recording) return;
   if (lastTimestamp === null) { lastTimestamp = now; return; }
 
   const dt = (now - lastTimestamp) / 1000;
   lastTimestamp = now;
   if (dt <= 0 || dt > 0.5) return;
 
-  let ax = e.acceleration.x || 0;
-  let ay = e.acceleration.y || 0;
-  let az = e.acceleration.z || 0;
+  const rawAx = (e.acceleration.x || 0);
+  const rawAy = (e.acceleration.y || 0);
+  const rawAz = (e.acceleration.z || 0);
 
-  // Transform device-frame accel to world-frame using orientation
-  const a = oriAlpha * Math.PI / 180;
-  const b = oriBeta  * Math.PI / 180;
-  const g = oriGamma * Math.PI / 180;
-
-  const cosA = Math.cos(a), sinA = Math.sin(a);
-  const cosB = Math.cos(b), sinB = Math.sin(b);
-  const cosG = Math.cos(g), sinG = Math.sin(g);
-
-  // ZXY rotation matrix
-  const wx = ax*(cosA*cosG + sinA*sinB*sinG) + ay*(sinA*cosB) + az*(cosA*sinG - sinA*sinB*cosG);
-  const wy = ax*(-sinA*cosG + cosA*sinB*sinG) + ay*(cosA*cosB) + az*(-sinA*sinG - cosA*sinB*cosG);
-  const wz = ax*(cosB*sinG) + ay*(-sinB) + az*(cosB*cosG);
-
-  // Noise gate
-  const fwx = Math.abs(wx) < ACCEL_THRESHOLD ? 0 : wx;
-  const fwy = Math.abs(wy) < ACCEL_THRESHOLD ? 0 : wy;
-  const fwz = Math.abs(wz) < ACCEL_THRESHOLD ? 0 : wz;
-
-  // Zero-velocity update
-  if (fwx === 0 && fwy === 0 && fwz === 0) {
-    lowAccelCount++;
-    if (lowAccelCount >= LOW_ACCEL_SAMPLES) {
-      velX *= 0.5; velY *= 0.5; velZ *= 0.5;
-    }
+  if (MODE === 'step') {
+    processStepMode(rawAx, rawAy, rawAz, dt, now);
   } else {
-    lowAccelCount = 0;
+    processRawMode(rawAx, rawAy, rawAz, dt, now);
   }
 
-  // Integrate
-  velX = velX * VELOCITY_DECAY + fwx * dt;
-  velY = velY * VELOCITY_DECAY + fwy * dt;
-  velZ = velZ * VELOCITY_DECAY + fwz * dt;
-
-  posX += velX * dt;
-  posY += velY * dt;
-  posZ += velZ * dt;
-
-  totalDistance += Math.sqrt((velX*dt)**2 + (velY*dt)**2);
-  sampleCount++;
-
   const elapsed = (now - startTime) / 1000;
-  path.push({ x: posX, y: posY, z: posZ, t: elapsed });
-
   updateInfo(elapsed);
 
-  // Throttle draw
-  if (now - lastDrawTime > DRAW_INTERVAL) {
+  if (now - lastDrawTime > 50) {
     lastDrawTime = now;
     drawMap();
   }
 }
 
-function updateInfo(elapsed) {
-  document.getElementById('totalDist').textContent = totalDistance.toFixed(2);
-  document.getElementById('totalTime').textContent = elapsed.toFixed(1);
-  document.getElementById('dispX').textContent = posX.toFixed(2);
-  document.getElementById('dispY').textContent = posY.toFixed(2);
-  document.getElementById('dispZ').textContent = posZ.toFixed(2);
-  document.getElementById('curSpeed').textContent = Math.sqrt(velX**2 + velY**2).toFixed(2);
-  document.getElementById('sampleCount').textContent = sampleCount;
+// ============ STEP MODE ============
+function processStepMode(ax, ay, az, dt, now) {
+  // Acceleration magnitude (device frame, doesn't matter for step detection)
+  const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+
+  // Simple peak detection for steps
+  if (mag > prevAccelMag) {
+    accelRising = true;
+  } else if (accelRising && prevAccelMag > STEP_THRESHOLD && (now - lastStepTime) > STEP_COOLDOWN) {
+    // Peak detected → step!
+    accelRising = false;
+    lastStepTime = now;
+    stepCount++;
+
+    // Use compass heading (alpha) for direction
+    // alpha: 0=North, 90=East, 180=South, 270=West
+    const heading = oriAlpha * Math.PI / 180;
+
+    // Step displacement in world frame
+    // X = East (+), Y = North (+)
+    const dx = STEP_LENGTH * Math.sin(heading);
+    const dy = STEP_LENGTH * Math.cos(heading);
+
+    posX += dx;
+    posY += dy;
+    totalDistance += STEP_LENGTH;
+
+    const elapsed = (now - startTime) / 1000;
+    path.push({ x: posX, y: posY, z: posZ, t: elapsed });
+  } else if (mag < prevAccelMag) {
+    accelRising = false;
+  }
+
+  prevAccelMag = mag;
+
+  // Vertical: simple integration on world-Z acceleration
+  const b = oriBeta * Math.PI / 180;
+  const g = oriGamma * Math.PI / 180;
+  const wz = ax * Math.cos(b) * Math.sin(g) + ay * (-Math.sin(b)) + az * Math.cos(b) * Math.cos(g);
+  const fwz = Math.abs(wz) < 0.2 ? 0 : wz;
+  velZ = velZ * 0.95 + fwz * dt;
+  posZ += velZ * dt;
+
+  document.getElementById('heading').textContent = oriAlpha.toFixed(0);
 }
 
-// ===== Map Drawing =====
-function drawMap() {
-  const w = canvas.width / dpr;
-  const h = canvas.height / dpr;
-  ctx.clearRect(0, 0, w, h);
+// ============ RAW MODE ============
+function processRawMode(rawAx, rawAy, rawAz, dt, now) {
+  // High-pass filter to remove bias drift
+  hpX = HP_ALPHA * (hpX + rawAx - prevRawX);
+  hpY = HP_ALPHA * (hpY + rawAy - prevRawY);
+  hpZ = HP_ALPHA * (hpZ + rawAz - prevRawZ);
+  prevRawX = rawAx; prevRawY = rawAy; prevRawZ = rawAz;
 
-  // Grid
-  ctx.strokeStyle = '#1a1a35';
-  ctx.lineWidth = 0.5;
-  for (let x = 0; x < w; x += 30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-  for (let y = 0; y < h; y += 30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+  const ax = hpX - accelBias.x;
+  const ay = hpY - accelBias.y;
+  const az = hpZ - accelBias.z;
 
-  if (path.length < 2) {
-    ctx.fillStyle = '#51cf66';
-    ctx.beginPath(); ctx.arc(w/2, h/2, 6, 0, Math.PI*2); ctx.fill();
-    if (!recording && path.length === 0) {
-      ctx.fillStyle = '#555'; ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('轨迹将在此处显示', w/2, h/2 + 30);
-    }
-    return;
-  }
+  // Transform to world frame
+  const a = oriAlpha * Math.PI / 180;
+  const b = oriBeta * Math.PI / 180;
+  const g = oriGamma * Math.PI / 180;
+  const cosA=Math.cos(a), sinA=Math.sin(a), cosB=Math.cos(b), sinB=Math.sin(b), cosG=Math.cos(g), sinG=Math.sin(g);
 
-  // Bounds
-  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-  for (const p of path) {
-    if (p.x<minX) minX=p.x; if (p.x>maxX) maxX=p.x;
-    if (p.y<minY) minY=p.y; if (p.y>maxY) maxY=p.y;
-  }
-  const rX = maxX-minX || 1, rY = maxY-minY || 1;
-  const pad = 0.25;
-  const pMinX=minX-rX*pad, pMaxX=maxX+rX*pad, pMinY=minY-rY*pad, pMaxY=maxY+rY*pad;
-  const pRX=pMaxX-pMinX, pRY=pMaxY-pMinY;
-  const scale = Math.min(w/pRX, h/pRY);
-  const offX = (w - pRX*scale)/2, offY = (h - pRY*scale)/2;
+  const wx = ax*(cosA*cosG+sinA*sinB*sinG) + ay*(sinA*cosB) + az*(cosA*sinG-sinA*sinB*cosG);
+  const wy = ax*(-sinA*cosG+cosA*sinB*sinG) + ay*(cosA*cosB) + az*(-sinA*sinG-cosA*sinB*cosG);
+  const wz = ax*(cosB*sinG) + ay*(-sinB) + az*(cosB*cosG);
 
-  function toS(px, py) {
-    return { sx: offX + (px-pMinX)*scale, sy: offY + (pMaxY-py)*scale };
-  }
+  const fwx = Math.abs(wx) < RAW_ACCEL_THRESHOLD ? 0 : wx;
+  const fwy = Math.abs(wy) < RAW_ACCEL_THRESHOLD ? 0 : wy;
+  const fwz = Math.abs(wz) < RAW_ACCEL_THRESHOLD ? 0 : wz;
 
-  // Scale bar
-  let sbm = 1, sbp = sbm*scale;
-  if (sbp<30) { sbm=5; sbp=sbm*scale; }
-  if (sbp<30) { sbm=10; sbp=sbm*scale; }
-  if (sbp>w*0.4) { sbm=0.5; sbp=sbm*scale; }
-  if (sbp>w*0.4) { sbm=0.1; sbp=sbm*scale; }
-  ctx.strokeStyle='#444'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(12,h-16); ctx.lineTo(12+sbp,h-16); ctx.stroke();
-  ctx.fillStyle='#666'; ctx.font='10px -apple-system, sans-serif'; ctx.textAlign='left';
-  ctx.fillText(sbm+' m', 12, h-22);
+  if (fwx===0 && fwy===0 && fwz===0) {
+    rawLowCount++;
+    if (rawLowCount >= RAW_LOW_SAMPLES) { velX*=0.4; velY*=0.4; velZ*=0.4; }
+  } else { rawLowCount = 0; }
 
-  // Path - downsample for performance
-  const maxPoints = 500;
-  const step = Math.max(1, Math.floor(path.length / maxPoints));
-  const sampled = [];
-  for (let i = 0; i < path.length; i += step) sampled.push(path[i]);
-  if (sampled[sampled.length-1] !== path[path.length-1]) sampled.push(path[path.length-1]);
+  velX = velX*RAW_VELOCITY_DECAY + fwx*dt;
+  velY = velY*RAW_VELOCITY_DECAY + fwy*dt;
+  velZ = velZ*RAW_VELOCITY_DECAY + fwz*dt;
 
-  ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  for (let i = 1; i < sampled.length; i++) {
-    const ratio = i / (sampled.length - 1);
-    const r = Math.round(74 + ratio*100);
-    const g2 = Math.round(144 + ratio*60);
-    const b2 = Math.min(Math.round(217 + ratio*30), 255);
-    ctx.strokeStyle = `rgba(${r},${g2},${b2},${0.5+ratio*0.5})`;
-    const p0 = toS(sampled[i-1].x, sampled[i-1].y);
-    const p1 = toS(sampled[i].x, sampled[i].y);
-    ctx.beginPath(); ctx.moveTo(p0.sx, p0.sy); ctx.lineTo(p1.sx, p1.sy); ctx.stroke();
-  }
+  const dxdt = velX*dt, dydt = velY*dt;
+  posX += dxdt; posY += dydt; posZ += velZ*dt;
+  totalDistance += Math.sqrt(dxdt*dxdt + dydt*dydt);
 
-  // Start (green)
-  const sp = toS(path[0].x, path[0].y);
-  ctx.fillStyle='#51cf66'; ctx.beginPath(); ctx.arc(sp.sx, sp.sy, 7, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 8px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('S', sp.sx, sp.sy);
+  const elapsed = (now - startTime) / 1000;
+  path.push({ x: posX, y: posY, z: posZ, t: elapsed });
 
-  // End (red)
-  const last = path[path.length-1];
-  const ep = toS(last.x, last.y);
-  ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep.sx, ep.sy, 7, 0, Math.PI*2); ctx.fill();
-
-  // Direction arrow
-  if (path.length > 5) {
-    const prev = toS(path[Math.max(0,path.length-6)].x, path[Math.max(0,path.length-6)].y);
-    const angle = Math.atan2(ep.sy-prev.sy, ep.sx-prev.sx);
-    ctx.strokeStyle='#ff6b6b'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(ep.sx, ep.sy);
-    ctx.lineTo(ep.sx + Math.cos(angle)*14, ep.sy + Math.sin(angle)*14); ctx.stroke();
-  }
-
-  // North
-  ctx.fillStyle='#555'; ctx.font='11px -apple-system, sans-serif'; ctx.textAlign='right';
-  ctx.fillText('↑ N', w-10, 18);
+  document.getElementById('heading').textContent = oriAlpha.toFixed(0);
 }
 
-// ===== Controls =====
-function requestPermission() {
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    Promise.all([
-      DeviceMotionEvent.requestPermission(),
-      DeviceOrientationEvent.requestPermission()
-    ]).then(([ms, os]) => {
-      if (ms === 'granted' && os === 'granted') onPermissionGranted();
-      else document.getElementById('status').textContent = '❌ 传感器权限被拒绝';
-    }).catch(err => {
-      document.getElementById('status').textContent = '❌ 权限请求失败: ' + err.message;
-    });
-  } else {
-    onPermissionGranted();
+// ============ CALIBRATION ============
+function startCalibration() {
+  calibrating = true;
+  calStartTime = performance.now();
+  calSamples = [];
+  document.getElementById('calOverlay').classList.remove('hidden');
+  document.getElementById('calFill').style.width = '0%';
+}
+
+function finishCalibration() {
+  calibrating = false;
+  document.getElementById('calOverlay').classList.add('hidden');
+
+  if (calSamples.length > 10) {
+    let sx=0, sy=0, sz=0;
+    for (const s of calSamples) { sx+=s.x; sy+=s.y; sz+=s.z; }
+    const n = calSamples.length;
+    // We only bias-correct the high-pass filtered signal in raw mode
+    // For step mode, calibration helps set a baseline
+    accelBias = { x: 0, y: 0, z: 0 }; // HP filter handles bias
   }
-}
 
-function onPermissionGranted() {
-  permissionGranted = true;
-  window.addEventListener('deviceorientation', handleOrientation, true);
-  window.addEventListener('devicemotion', handleMotion, true);
-  document.getElementById('permBtn').disabled = true;
-  document.getElementById('permBtn').textContent = '✅ 已授权';
-  document.getElementById('startBtn').disabled = false;
-  document.getElementById('status').textContent = '传感器已就绪，点击「开始记录」后开始走动';
-}
-
-function startRecording() {
-  if (!permissionGranted) return;
   recording = true;
   lastTimestamp = null;
   startTime = performance.now();
@@ -447,26 +415,199 @@ function startRecording() {
   document.getElementById('status').textContent = '🔴 正在记录... 拿着手机走动吧！';
 }
 
+// ============ UI ============
+function updateInfo(elapsed) {
+  document.getElementById('stepCount').textContent = stepCount;
+  document.getElementById('totalDist').textContent = totalDistance.toFixed(2);
+  document.getElementById('totalTime').textContent = elapsed.toFixed(1);
+  document.getElementById('dispX').textContent = posX.toFixed(2);
+  document.getElementById('dispY').textContent = posY.toFixed(2);
+  document.getElementById('dispZ').textContent = posZ.toFixed(2);
+  const speed = MODE === 'step'
+    ? (stepCount > 1 && elapsed > 0 ? totalDistance / elapsed : 0)
+    : Math.sqrt(velX**2 + velY**2);
+  document.getElementById('curSpeed').textContent = speed.toFixed(2);
+}
+
+// ============ MAP ============
+function drawMap() {
+  const w = canvas.width / dpr;
+  const h = canvas.height / dpr;
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid
+  ctx.strokeStyle = '#1a1a35'; ctx.lineWidth = 0.5;
+  for (let x=0; x<w; x+=30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for (let y=0; y<h; y+=30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+
+  // Crosshair at center when no path
+  if (path.length < 2) {
+    // Origin
+    ctx.fillStyle = '#51cf66';
+    ctx.beginPath(); ctx.arc(w/2, h/2, 6, 0, Math.PI*2); ctx.fill();
+    // Compass arrow
+    if (permissionGranted) {
+      const hdg = oriAlpha * Math.PI / 180;
+      ctx.strokeStyle = 'rgba(126,184,255,0.4)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(w/2, h/2);
+      ctx.lineTo(w/2 + Math.sin(hdg)*40, h/2 - Math.cos(hdg)*40);
+      ctx.stroke();
+    }
+    if (!recording && path.length === 0) {
+      ctx.fillStyle = '#555'; ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('轨迹将在此处显示', w/2, h/2+30);
+    }
+    return;
+  }
+
+  // Bounds
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  for (const p of path) {
+    if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+    if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+  }
+  // Ensure minimum range of 2m
+  const rX = Math.max(maxX-minX, 2), rY = Math.max(maxY-minY, 2);
+  const pad = 0.3;
+  const pMinX=minX-rX*pad, pMaxX=maxX+rX*pad, pMinY=minY-rY*pad, pMaxY=maxY+rY*pad;
+  const pRX=pMaxX-pMinX, pRY=pMaxY-pMinY;
+  const scale = Math.min(w/pRX, h/pRY);
+  const offX=(w-pRX*scale)/2, offY=(h-pRY*scale)/2;
+
+  function toS(px,py) {
+    return { sx: offX+(px-pMinX)*scale, sy: offY+(pMaxY-py)*scale };
+  }
+
+  // Scale bar
+  let sbm=1, sbp=sbm*scale;
+  if(sbp<30){sbm=5;sbp=sbm*scale;}
+  if(sbp<30){sbm=10;sbp=sbm*scale;}
+  if(sbp>w*0.4){sbm=0.5;sbp=sbm*scale;}
+  if(sbp>w*0.4){sbm=0.1;sbp=sbm*scale;}
+  ctx.strokeStyle='#444'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(12,h-16); ctx.lineTo(12+sbp,h-16); ctx.stroke();
+  ctx.fillStyle='#666'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='left';
+  ctx.fillText(sbm+' m',12,h-22);
+
+  // Downsample for perf
+  const maxPts = 600;
+  const step = Math.max(1, Math.floor(path.length/maxPts));
+  const sampled = [];
+  for(let i=0; i<path.length; i+=step) sampled.push(path[i]);
+  if(sampled[sampled.length-1]!==path[path.length-1]) sampled.push(path[path.length-1]);
+
+  // Draw path
+  ctx.lineWidth = 3; ctx.lineJoin='round'; ctx.lineCap='round';
+  for(let i=1; i<sampled.length; i++) {
+    const ratio = i/(sampled.length-1);
+    const r=Math.round(60+ratio*120), g=Math.round(130+ratio*80), b=Math.min(Math.round(220+ratio*30),255);
+    ctx.strokeStyle = `rgba(${r},${g},${b},${0.5+ratio*0.5})`;
+    const p0=toS(sampled[i-1].x,sampled[i-1].y), p1=toS(sampled[i].x,sampled[i].y);
+    ctx.beginPath(); ctx.moveTo(p0.sx,p0.sy); ctx.lineTo(p1.sx,p1.sy); ctx.stroke();
+  }
+
+  // Step dots in step mode
+  if (MODE === 'step' && path.length < 200) {
+    ctx.fillStyle = 'rgba(126,184,255,0.5)';
+    for (const p of path) {
+      const sp = toS(p.x, p.y);
+      ctx.beginPath(); ctx.arc(sp.sx, sp.sy, 3, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // Start
+  const sp = toS(path[0].x, path[0].y);
+  ctx.fillStyle='#51cf66'; ctx.beginPath(); ctx.arc(sp.sx,sp.sy,8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('S',sp.sx,sp.sy);
+
+  // End
+  const last = path[path.length-1];
+  const ep = toS(last.x, last.y);
+  ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep.sx,ep.sy,8,0,Math.PI*2); ctx.fill();
+
+  // Heading arrow at end
+  const hdg = oriAlpha * Math.PI / 180;
+  ctx.strokeStyle='rgba(255,107,107,0.8)'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(ep.sx, ep.sy);
+  ctx.lineTo(ep.sx + Math.sin(hdg)*18, ep.sy - Math.cos(hdg)*18); ctx.stroke();
+
+  // North
+  ctx.fillStyle='#555'; ctx.font='11px -apple-system,sans-serif'; ctx.textAlign='right';
+  ctx.fillText('↑ N',w-10,18);
+
+  // Return line (dashed)
+  const dist = Math.sqrt((last.x-path[0].x)**2 + (last.y-path[0].y)**2);
+  if (dist > 0.2) {
+    ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(sp.sx,sp.sy); ctx.lineTo(ep.sx,ep.sy); ctx.stroke();
+    ctx.setLineDash([]);
+    // Distance label
+    const mx=(sp.sx+ep.sx)/2, my=(sp.sy+ep.sy)/2;
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(dist.toFixed(1)+'m', mx, my-6);
+  }
+}
+
+// ============ CONTROLS ============
+function requestPermission() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    Promise.all([
+      DeviceMotionEvent.requestPermission(),
+      DeviceOrientationEvent.requestPermission()
+    ]).then(([ms,os]) => {
+      if(ms==='granted'&&os==='granted') onPermGranted();
+      else document.getElementById('status').textContent='❌ 权限被拒绝';
+    }).catch(err => {
+      document.getElementById('status').textContent='❌ '+err.message;
+    });
+  } else {
+    onPermGranted();
+  }
+}
+
+function onPermGranted() {
+  permissionGranted = true;
+  window.addEventListener('deviceorientation', handleOrientation, true);
+  window.addEventListener('devicemotion', handleMotion, true);
+  document.getElementById('permBtn').disabled=true;
+  document.getElementById('permBtn').textContent='✅ 已授权';
+  document.getElementById('startBtn').disabled=false;
+  document.getElementById('status').textContent='传感器就绪。点击「开始」后请将手机静置 2 秒进行校准。';
+}
+
+function startRecording() {
+  if(!permissionGranted) return;
+  startCalibration();
+}
+
 function stopRecording() {
   recording = false;
-  document.getElementById('startBtn').disabled = false;
-  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('startBtn').disabled=false;
+  document.getElementById('stopBtn').disabled=true;
   drawMap();
-  const elapsed = path.length > 0 ? path[path.length-1].t : 0;
-  document.getElementById('status').textContent =
-    `✅ 记录完成！共 ${sampleCount} 个采样点，${elapsed.toFixed(1)} 秒，${totalDistance.toFixed(2)} 米`;
+  const elapsed = path.length>0 ? path[path.length-1].t : 0;
+  const info = MODE==='step'
+    ? `共 ${stepCount} 步，${totalDistance.toFixed(2)} 米`
+    : `共 ${path.length} 个采样点，${totalDistance.toFixed(2)} 米`;
+  document.getElementById('status').textContent=`✅ 记录完成！${info}，${elapsed.toFixed(1)} 秒`;
 }
 
 function resetAll() {
-  recording = false; lastTimestamp = null;
-  posX=0; posY=0; posZ=0; velX=0; velY=0; velZ=0;
-  path=[]; totalDistance=0; sampleCount=0; lowAccelCount=0;
-  document.getElementById('startBtn').disabled = !permissionGranted;
-  document.getElementById('stopBtn').disabled = true;
-  ['totalDist','dispX','dispY','dispZ','curSpeed'].forEach(id => document.getElementById(id).textContent = '0.00');
-  document.getElementById('totalTime').textContent = '0.0';
-  document.getElementById('sampleCount').textContent = '0';
-  document.getElementById('status').textContent = permissionGranted ? '已重置，点击「开始记录」重新开始' : '请先授权传感器';
+  recording=false; calibrating=false; lastTimestamp=null;
+  posX=0;posY=0;posZ=0;velX=0;velY=0;velZ=0;
+  path=[]; totalDistance=0; stepCount=0; rawLowCount=0;
+  prevAccelMag=0; accelRising=false; lastStepTime=0;
+  hpX=0;hpY=0;hpZ=0;prevRawX=0;prevRawY=0;prevRawZ=0;
+  accelBias={x:0,y:0,z:0};
+  document.getElementById('calOverlay').classList.add('hidden');
+  document.getElementById('startBtn').disabled=!permissionGranted;
+  document.getElementById('stopBtn').disabled=true;
+  ['totalDist','dispX','dispY','dispZ','curSpeed'].forEach(id=>document.getElementById(id).textContent='0.00');
+  document.getElementById('totalTime').textContent='0.0';
+  document.getElementById('stepCount').textContent='0';
+  document.getElementById('stepLen').textContent=STEP_LENGTH.toFixed(2);
+  document.getElementById('status').textContent=permissionGranted?'已重置':'请先授权传感器';
   drawMap();
 }
 
