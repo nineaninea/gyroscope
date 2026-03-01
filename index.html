@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>运动传感器</title>
+<title>运动轨迹追踪</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -14,299 +14,463 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    padding: 16px;
+    overflow-x: hidden;
   }
   h1 {
-    font-size: 1.4rem;
-    margin-bottom: 16px;
+    font-size: 1.3rem;
+    margin-bottom: 12px;
     color: #7eb8ff;
     text-align: center;
   }
-  #startBtn {
-    background: linear-gradient(135deg, #4a90d9, #357abd);
-    color: white;
-    border: none;
-    padding: 14px 36px;
-    border-radius: 12px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 15px rgba(74, 144, 217, 0.4);
-    transition: transform 0.15s;
-  }
-  #startBtn:active { transform: scale(0.96); }
-  #startBtn.hidden { display: none; }
-
-  .section {
-    width: 100%;
-    max-width: 400px;
-    background: #12122a;
-    border-radius: 16px;
-    padding: 18px;
-    margin-bottom: 16px;
-    border: 1px solid #1e1e40;
-  }
-  .section-title {
-    font-size: 0.85rem;
-    color: #8888aa;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 12px;
-  }
-  .row {
+  .controls {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
-  .row:last-child { margin-bottom: 0; }
-  .label {
+  .btn {
+    border: none;
+    padding: 12px 28px;
+    border-radius: 12px;
     font-size: 1rem;
     font-weight: 600;
-    min-width: 30px;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.2s;
+    color: white;
   }
-  .label.x { color: #ff6b6b; }
-  .label.y { color: #51cf66; }
-  .label.z { color: #339af0; }
-
-  .bar-container {
-    flex: 1;
-    height: 22px;
-    background: #1a1a35;
-    border-radius: 11px;
-    margin: 0 12px;
-    overflow: hidden;
-    position: relative;
-  }
-  .bar-center {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    width: 1px;
-    height: 100%;
-    background: #333355;
-  }
-  .bar {
-    position: absolute;
-    top: 2px;
-    height: 18px;
-    border-radius: 9px;
-    transition: left 0.08s, width 0.08s;
-  }
-  .bar.x { background: rgba(255, 107, 107, 0.7); }
-  .bar.y { background: rgba(81, 207, 102, 0.7); }
-  .bar.z { background: rgba(51, 154, 240, 0.7); }
-
-  .value {
-    font-size: 0.95rem;
-    font-variant-numeric: tabular-nums;
-    min-width: 75px;
-    text-align: right;
-  }
-
-  .cube-container {
+  .btn:active { transform: scale(0.96); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-start { background: linear-gradient(135deg, #51cf66, #37b24d); box-shadow: 0 4px 12px rgba(81,207,102,0.3); }
+  .btn-stop { background: linear-gradient(135deg, #ff6b6b, #e03131); box-shadow: 0 4px 12px rgba(255,107,107,0.3); }
+  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); box-shadow: 0 4px 12px rgba(134,142,150,0.3); }
+  .btn-permission { background: linear-gradient(135deg, #4a90d9, #357abd); box-shadow: 0 4px 15px rgba(74,144,217,0.4); }
+  .map-container {
     width: 100%;
-    max-width: 400px;
-    height: 220px;
-    perspective: 600px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  .cube {
-    width: 100px;
-    height: 100px;
+    max-width: 420px;
+    aspect-ratio: 1;
+    background: #0d0d24;
+    border-radius: 16px;
+    border: 1px solid #1e1e40;
     position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.1s ease-out;
+    overflow: hidden;
+    margin-bottom: 14px;
+    touch-action: none;
   }
-  .face {
-    position: absolute;
-    width: 100px;
-    height: 100px;
-    border: 2px solid rgba(255,255,255,0.15);
+  canvas { width: 100%; height: 100%; display: block; }
+  .info-grid {
+    width: 100%;
+    max-width: 420px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .info-card {
+    background: #12122a;
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid #1e1e40;
+    text-align: center;
+  }
+  .info-card.full { grid-column: 1 / -1; }
+  .info-label {
+    font-size: 0.7rem;
+    color: #8888aa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .info-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #ccc;
+  }
+  .info-value.highlight { color: #7eb8ff; }
+  .info-value.green { color: #51cf66; }
+  .info-value.red { color: #ff6b6b; }
+  .legend {
+    width: 100%;
+    max-width: 420px;
     display: flex;
     justify-content: center;
-    align-items: center;
+    gap: 16px;
     font-size: 0.75rem;
-    font-weight: 700;
-    border-radius: 8px;
+    color: #666;
+    margin-bottom: 10px;
   }
-  .front  { background: rgba(74,144,217,0.4); transform: translateZ(50px); }
-  .back   { background: rgba(74,144,217,0.2); transform: rotateY(180deg) translateZ(50px); }
-  .right  { background: rgba(255,107,107,0.3); transform: rotateY(90deg) translateZ(50px); }
-  .left   { background: rgba(255,107,107,0.2); transform: rotateY(-90deg) translateZ(50px); }
-  .top    { background: rgba(81,207,102,0.3); transform: rotateX(90deg) translateZ(50px); }
-  .bottom { background: rgba(81,207,102,0.2); transform: rotateX(-90deg) translateZ(50px); }
-
+  .legend span::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .legend .start::before { background: #51cf66; }
+  .legend .end::before { background: #ff6b6b; }
+  .legend .path::before { background: #4a90d9; }
   #status {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #666;
     text-align: center;
-    margin-top: 8px;
+    margin-top: 4px;
+    max-width: 420px;
+    line-height: 1.4;
+  }
+  .warning {
+    width: 100%;
+    max-width: 420px;
+    background: #1a1a00;
+    border: 1px solid #444400;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.75rem;
+    color: #bbbb44;
+    margin-bottom: 14px;
+    line-height: 1.4;
+    text-align: center;
   }
 </style>
 </head>
 <body>
 
-<h1>📱 运动传感器</h1>
+<h1>🗺️ 运动轨迹追踪</h1>
 
-<button id="startBtn" onclick="requestPermission()">点击开启传感器</button>
+<div class="warning">
+  ⚠️ 加速度计二次积分存在累积漂移，轨迹仅供短距离参考（建议 &lt; 30秒）。
+</div>
 
-<div class="cube-container">
-  <div class="cube" id="cube">
-    <div class="face front">前</div>
-    <div class="face back">后</div>
-    <div class="face right">右</div>
-    <div class="face left">左</div>
-    <div class="face top">上</div>
-    <div class="face bottom">下</div>
+<div class="controls">
+  <button class="btn btn-permission" id="permBtn" onclick="requestPermission()">授权传感器</button>
+  <button class="btn btn-start" id="startBtn" onclick="startRecording()" disabled>▶ 开始记录</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>⏹ 停止记录</button>
+  <button class="btn btn-reset" id="resetBtn" onclick="resetAll()">↻ 重置</button>
+</div>
+
+<div class="legend">
+  <span class="start">起点</span>
+  <span class="path">轨迹</span>
+  <span class="end">当前/终点</span>
+</div>
+
+<div class="map-container">
+  <canvas id="mapCanvas"></canvas>
+</div>
+
+<div class="info-grid">
+  <div class="info-card">
+    <div class="info-label">总距离 (m)</div>
+    <div class="info-value highlight" id="totalDist">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">记录时间 (s)</div>
+    <div class="info-value" id="totalTime">0.0</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">水平位移 X (m)</div>
+    <div class="info-value green" id="dispX">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">水平位移 Y (m)</div>
+    <div class="info-value green" id="dispY">0.00</div>
+  </div>
+  <div class="info-card full">
+    <div class="info-label">垂直高度变化 (m)</div>
+    <div class="info-value red" id="dispZ">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">当前速度 (m/s)</div>
+    <div class="info-value" id="curSpeed">0.00</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">采样点数</div>
+    <div class="info-value" id="sampleCount">0</div>
   </div>
 </div>
 
-<!-- 用户加速度 -->
-<div class="section">
-  <div class="section-title">用户加速度（不含重力）m/s²</div>
-  <div class="row">
-    <span class="label x">X</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar x" id="axBar"></div></div>
-    <span class="value" id="ax">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label y">Y</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar y" id="ayBar"></div></div>
-    <span class="value" id="ay">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label z">Z</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar z" id="azBar"></div></div>
-    <span class="value" id="az">0.00</span>
-  </div>
-</div>
-
-<!-- 陀螺仪旋转速率 -->
-<div class="section">
-  <div class="section-title">陀螺仪旋转速率 °/s</div>
-  <div class="row">
-    <span class="label x">α</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar x" id="raBar"></div></div>
-    <span class="value" id="ra">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label y">β</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar y" id="rbBar"></div></div>
-    <span class="value" id="rb">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label z">γ</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar z" id="rcBar"></div></div>
-    <span class="value" id="rc">0.00</span>
-  </div>
-</div>
-
-<!-- 设备方向 -->
-<div class="section">
-  <div class="section-title">设备方向 °</div>
-  <div class="row">
-    <span class="label x">α</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar x" id="oaBar"></div></div>
-    <span class="value" id="oa">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label y">β</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar y" id="obBar"></div></div>
-    <span class="value" id="ob">0.00</span>
-  </div>
-  <div class="row">
-    <span class="label z">γ</span>
-    <div class="bar-container"><div class="bar-center"></div><div class="bar z" id="ocBar"></div></div>
-    <span class="value" id="oc">0.00</span>
-  </div>
-</div>
-
-<div id="status">等待启动传感器...</div>
+<div id="status">请先点击「授权传感器」</div>
 
 <script>
-function updateBar(barId, value, maxVal) {
-  const bar = document.getElementById(barId);
-  const pct = Math.min(Math.abs(value) / maxVal, 1);
-  const width = pct * 50;
-  if (value >= 0) {
-    bar.style.left = '50%';
-    bar.style.width = width + '%';
-  } else {
-    bar.style.left = (50 - width) + '%';
-    bar.style.width = width + '%';
-  }
-}
+// ===== State =====
+let recording = false;
+let permissionGranted = false;
+let lastTimestamp = null;
 
-function fmt(v) {
-  if (v == null) return '--';
-  return v.toFixed(2);
+let posX = 0, posY = 0, posZ = 0;
+let velX = 0, velY = 0, velZ = 0;
+let oriAlpha = 0, oriBeta = 0, oriGamma = 0;
+
+let path = [];
+let totalDistance = 0;
+let startTime = 0;
+let sampleCount = 0;
+
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+
+// Filters
+const ACCEL_THRESHOLD = 0.12;
+const VELOCITY_DECAY = 0.985;
+let lowAccelCount = 0;
+const LOW_ACCEL_SAMPLES = 5;
+
+// Throttle drawing to ~20fps
+let lastDrawTime = 0;
+const DRAW_INTERVAL = 50;
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawMap();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ===== Sensor Handlers =====
+function handleOrientation(e) {
+  oriAlpha = e.alpha || 0;
+  oriBeta = e.beta || 0;
+  oriGamma = e.gamma || 0;
 }
 
 function handleMotion(e) {
-  const a = e.acceleration || {};
-  document.getElementById('ax').textContent = fmt(a.x);
-  document.getElementById('ay').textContent = fmt(a.y);
-  document.getElementById('az').textContent = fmt(a.z);
-  updateBar('axBar', a.x || 0, 10);
-  updateBar('ayBar', a.y || 0, 10);
-  updateBar('azBar', a.z || 0, 10);
+  if (!recording) return;
 
-  const rr = e.rotationRate || {};
-  document.getElementById('ra').textContent = fmt(rr.alpha);
-  document.getElementById('rb').textContent = fmt(rr.beta);
-  document.getElementById('rc').textContent = fmt(rr.gamma);
-  updateBar('raBar', rr.alpha || 0, 360);
-  updateBar('rbBar', rr.beta || 0, 360);
-  updateBar('rcBar', rr.gamma || 0, 360);
-}
+  const now = performance.now();
+  if (lastTimestamp === null) { lastTimestamp = now; return; }
 
-function handleOrientation(e) {
-  const alpha = e.alpha || 0;
-  const beta = e.beta || 0;
-  const gamma = e.gamma || 0;
+  const dt = (now - lastTimestamp) / 1000;
+  lastTimestamp = now;
+  if (dt <= 0 || dt > 0.5) return;
 
-  document.getElementById('oa').textContent = fmt(alpha);
-  document.getElementById('ob').textContent = fmt(beta);
-  document.getElementById('oc').textContent = fmt(gamma);
-  updateBar('oaBar', alpha - 180, 180);
-  updateBar('obBar', beta, 180);
-  updateBar('ocBar', gamma, 90);
+  let ax = e.acceleration.x || 0;
+  let ay = e.acceleration.y || 0;
+  let az = e.acceleration.z || 0;
 
-  const cube = document.getElementById('cube');
-  cube.style.transform = `rotateX(${beta}deg) rotateY(${gamma}deg) rotateZ(${-alpha}deg)`;
-}
+  // Transform device-frame accel to world-frame using orientation
+  const a = oriAlpha * Math.PI / 180;
+  const b = oriBeta  * Math.PI / 180;
+  const g = oriGamma * Math.PI / 180;
 
-function startListeners() {
-  window.addEventListener('devicemotion', handleMotion, true);
-  window.addEventListener('deviceorientation', handleOrientation, true);
-  document.getElementById('status').textContent = '✅ 传感器已激活 — 移动手机查看数据';
-  document.getElementById('startBtn').classList.add('hidden');
-}
+  const cosA = Math.cos(a), sinA = Math.sin(a);
+  const cosB = Math.cos(b), sinB = Math.sin(b);
+  const cosG = Math.cos(g), sinG = Math.sin(g);
 
-function requestPermission() {
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission()
-      .then(state => {
-        if (state === 'granted') {
-          DeviceOrientationEvent.requestPermission().then(s => {
-            if (s === 'granted') startListeners();
-          });
-        } else {
-          document.getElementById('status').textContent = '❌ 传感器权限被拒绝';
-        }
-      })
-      .catch(err => {
-        document.getElementById('status').textContent = '❌ 请求权限失败: ' + err.message;
-      });
+  // ZXY rotation matrix
+  const wx = ax*(cosA*cosG + sinA*sinB*sinG) + ay*(sinA*cosB) + az*(cosA*sinG - sinA*sinB*cosG);
+  const wy = ax*(-sinA*cosG + cosA*sinB*sinG) + ay*(cosA*cosB) + az*(-sinA*sinG - cosA*sinB*cosG);
+  const wz = ax*(cosB*sinG) + ay*(-sinB) + az*(cosB*cosG);
+
+  // Noise gate
+  const fwx = Math.abs(wx) < ACCEL_THRESHOLD ? 0 : wx;
+  const fwy = Math.abs(wy) < ACCEL_THRESHOLD ? 0 : wy;
+  const fwz = Math.abs(wz) < ACCEL_THRESHOLD ? 0 : wz;
+
+  // Zero-velocity update
+  if (fwx === 0 && fwy === 0 && fwz === 0) {
+    lowAccelCount++;
+    if (lowAccelCount >= LOW_ACCEL_SAMPLES) {
+      velX *= 0.5; velY *= 0.5; velZ *= 0.5;
+    }
   } else {
-    startListeners();
+    lowAccelCount = 0;
+  }
+
+  // Integrate
+  velX = velX * VELOCITY_DECAY + fwx * dt;
+  velY = velY * VELOCITY_DECAY + fwy * dt;
+  velZ = velZ * VELOCITY_DECAY + fwz * dt;
+
+  posX += velX * dt;
+  posY += velY * dt;
+  posZ += velZ * dt;
+
+  totalDistance += Math.sqrt((velX*dt)**2 + (velY*dt)**2);
+  sampleCount++;
+
+  const elapsed = (now - startTime) / 1000;
+  path.push({ x: posX, y: posY, z: posZ, t: elapsed });
+
+  updateInfo(elapsed);
+
+  // Throttle draw
+  if (now - lastDrawTime > DRAW_INTERVAL) {
+    lastDrawTime = now;
+    drawMap();
   }
 }
+
+function updateInfo(elapsed) {
+  document.getElementById('totalDist').textContent = totalDistance.toFixed(2);
+  document.getElementById('totalTime').textContent = elapsed.toFixed(1);
+  document.getElementById('dispX').textContent = posX.toFixed(2);
+  document.getElementById('dispY').textContent = posY.toFixed(2);
+  document.getElementById('dispZ').textContent = posZ.toFixed(2);
+  document.getElementById('curSpeed').textContent = Math.sqrt(velX**2 + velY**2).toFixed(2);
+  document.getElementById('sampleCount').textContent = sampleCount;
+}
+
+// ===== Map Drawing =====
+function drawMap() {
+  const w = canvas.width / dpr;
+  const h = canvas.height / dpr;
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid
+  ctx.strokeStyle = '#1a1a35';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < w; x += 30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+
+  if (path.length < 2) {
+    ctx.fillStyle = '#51cf66';
+    ctx.beginPath(); ctx.arc(w/2, h/2, 6, 0, Math.PI*2); ctx.fill();
+    if (!recording && path.length === 0) {
+      ctx.fillStyle = '#555'; ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('轨迹将在此处显示', w/2, h/2 + 30);
+    }
+    return;
+  }
+
+  // Bounds
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  for (const p of path) {
+    if (p.x<minX) minX=p.x; if (p.x>maxX) maxX=p.x;
+    if (p.y<minY) minY=p.y; if (p.y>maxY) maxY=p.y;
+  }
+  const rX = maxX-minX || 1, rY = maxY-minY || 1;
+  const pad = 0.25;
+  const pMinX=minX-rX*pad, pMaxX=maxX+rX*pad, pMinY=minY-rY*pad, pMaxY=maxY+rY*pad;
+  const pRX=pMaxX-pMinX, pRY=pMaxY-pMinY;
+  const scale = Math.min(w/pRX, h/pRY);
+  const offX = (w - pRX*scale)/2, offY = (h - pRY*scale)/2;
+
+  function toS(px, py) {
+    return { sx: offX + (px-pMinX)*scale, sy: offY + (pMaxY-py)*scale };
+  }
+
+  // Scale bar
+  let sbm = 1, sbp = sbm*scale;
+  if (sbp<30) { sbm=5; sbp=sbm*scale; }
+  if (sbp<30) { sbm=10; sbp=sbm*scale; }
+  if (sbp>w*0.4) { sbm=0.5; sbp=sbm*scale; }
+  if (sbp>w*0.4) { sbm=0.1; sbp=sbm*scale; }
+  ctx.strokeStyle='#444'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(12,h-16); ctx.lineTo(12+sbp,h-16); ctx.stroke();
+  ctx.fillStyle='#666'; ctx.font='10px -apple-system, sans-serif'; ctx.textAlign='left';
+  ctx.fillText(sbm+' m', 12, h-22);
+
+  // Path - downsample for performance
+  const maxPoints = 500;
+  const step = Math.max(1, Math.floor(path.length / maxPoints));
+  const sampled = [];
+  for (let i = 0; i < path.length; i += step) sampled.push(path[i]);
+  if (sampled[sampled.length-1] !== path[path.length-1]) sampled.push(path[path.length-1]);
+
+  ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (let i = 1; i < sampled.length; i++) {
+    const ratio = i / (sampled.length - 1);
+    const r = Math.round(74 + ratio*100);
+    const g2 = Math.round(144 + ratio*60);
+    const b2 = Math.min(Math.round(217 + ratio*30), 255);
+    ctx.strokeStyle = `rgba(${r},${g2},${b2},${0.5+ratio*0.5})`;
+    const p0 = toS(sampled[i-1].x, sampled[i-1].y);
+    const p1 = toS(sampled[i].x, sampled[i].y);
+    ctx.beginPath(); ctx.moveTo(p0.sx, p0.sy); ctx.lineTo(p1.sx, p1.sy); ctx.stroke();
+  }
+
+  // Start (green)
+  const sp = toS(path[0].x, path[0].y);
+  ctx.fillStyle='#51cf66'; ctx.beginPath(); ctx.arc(sp.sx, sp.sy, 7, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 8px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('S', sp.sx, sp.sy);
+
+  // End (red)
+  const last = path[path.length-1];
+  const ep = toS(last.x, last.y);
+  ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep.sx, ep.sy, 7, 0, Math.PI*2); ctx.fill();
+
+  // Direction arrow
+  if (path.length > 5) {
+    const prev = toS(path[Math.max(0,path.length-6)].x, path[Math.max(0,path.length-6)].y);
+    const angle = Math.atan2(ep.sy-prev.sy, ep.sx-prev.sx);
+    ctx.strokeStyle='#ff6b6b'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(ep.sx, ep.sy);
+    ctx.lineTo(ep.sx + Math.cos(angle)*14, ep.sy + Math.sin(angle)*14); ctx.stroke();
+  }
+
+  // North
+  ctx.fillStyle='#555'; ctx.font='11px -apple-system, sans-serif'; ctx.textAlign='right';
+  ctx.fillText('↑ N', w-10, 18);
+}
+
+// ===== Controls =====
+function requestPermission() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    Promise.all([
+      DeviceMotionEvent.requestPermission(),
+      DeviceOrientationEvent.requestPermission()
+    ]).then(([ms, os]) => {
+      if (ms === 'granted' && os === 'granted') onPermissionGranted();
+      else document.getElementById('status').textContent = '❌ 传感器权限被拒绝';
+    }).catch(err => {
+      document.getElementById('status').textContent = '❌ 权限请求失败: ' + err.message;
+    });
+  } else {
+    onPermissionGranted();
+  }
+}
+
+function onPermissionGranted() {
+  permissionGranted = true;
+  window.addEventListener('deviceorientation', handleOrientation, true);
+  window.addEventListener('devicemotion', handleMotion, true);
+  document.getElementById('permBtn').disabled = true;
+  document.getElementById('permBtn').textContent = '✅ 已授权';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('status').textContent = '传感器已就绪，点击「开始记录」后开始走动';
+}
+
+function startRecording() {
+  if (!permissionGranted) return;
+  recording = true;
+  lastTimestamp = null;
+  startTime = performance.now();
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  document.getElementById('status').textContent = '🔴 正在记录... 拿着手机走动吧！';
+}
+
+function stopRecording() {
+  recording = false;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  drawMap();
+  const elapsed = path.length > 0 ? path[path.length-1].t : 0;
+  document.getElementById('status').textContent =
+    `✅ 记录完成！共 ${sampleCount} 个采样点，${elapsed.toFixed(1)} 秒，${totalDistance.toFixed(2)} 米`;
+}
+
+function resetAll() {
+  recording = false; lastTimestamp = null;
+  posX=0; posY=0; posZ=0; velX=0; velY=0; velZ=0;
+  path=[]; totalDistance=0; sampleCount=0; lowAccelCount=0;
+  document.getElementById('startBtn').disabled = !permissionGranted;
+  document.getElementById('stopBtn').disabled = true;
+  ['totalDist','dispX','dispY','dispZ','curSpeed'].forEach(id => document.getElementById(id).textContent = '0.00');
+  document.getElementById('totalTime').textContent = '0.0';
+  document.getElementById('sampleCount').textContent = '0';
+  document.getElementById('status').textContent = permissionGranted ? '已重置，点击「开始记录」重新开始' : '请先授权传感器';
+  drawMap();
+}
+
+resizeCanvas();
 </script>
 </body>
 </html>
