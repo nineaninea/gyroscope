@@ -3,30 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>运动轨迹追踪 v2</title>
+<title>运动轨迹追踪 v3</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0a0a1a;
-    color: #e0e0e0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 16px;
-    overflow-x: hidden;
+    background: #0a0a1a; color: #e0e0e0;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 16px; overflow-x: hidden;
   }
-  h1 { font-size: 1.3rem; margin-bottom: 8px; color: #7eb8ff; text-align: center; }
-  .subtitle { font-size: 0.75rem; color: #666; margin-bottom: 12px; text-align: center; }
+  h1 { font-size: 1.3rem; margin-bottom: 6px; color: #7eb8ff; text-align: center; }
+  .subtitle { font-size: 0.72rem; color: #666; margin-bottom: 12px; text-align: center; }
 
-  .controls {
-    display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center;
-  }
+  .controls { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
   .btn {
     border: none; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;
-    font-weight: 600; cursor: pointer; color: white;
-    transition: transform 0.15s, opacity 0.2s;
+    font-weight: 600; cursor: pointer; color: white; transition: transform 0.15s, opacity 0.2s;
   }
   .btn:active { transform: scale(0.96); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -36,12 +28,11 @@
   .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
 
   .mode-toggle {
-    width: 100%; max-width: 420px; display: flex; gap: 0;
-    margin-bottom: 14px; border-radius: 10px; overflow: hidden;
-    border: 1px solid #1e1e40;
+    width: 100%; max-width: 420px; display: flex;
+    margin-bottom: 12px; border-radius: 10px; overflow: hidden; border: 1px solid #1e1e40;
   }
   .mode-btn {
-    flex: 1; padding: 10px; text-align: center; font-size: 0.8rem; font-weight: 600;
+    flex: 1; padding: 10px; text-align: center; font-size: 0.78rem; font-weight: 600;
     background: #12122a; color: #666; border: none; cursor: pointer;
     transition: background 0.2s, color 0.2s;
   }
@@ -50,20 +41,19 @@
   .map-container {
     width: 100%; max-width: 420px; aspect-ratio: 1;
     background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
-    position: relative; overflow: hidden; margin-bottom: 14px;
+    position: relative; overflow: hidden; margin-bottom: 12px;
   }
   canvas { width: 100%; height: 100%; display: block; }
 
   .info-grid {
     width: 100%; max-width: 420px;
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;
   }
   .info-card {
     background: #12122a; border-radius: 10px; padding: 10px;
     border: 1px solid #1e1e40; text-align: center;
   }
-  .info-card.span2 { grid-column: span 2; }
-  .info-label { font-size: 0.65rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .info-label { font-size: 0.63rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
   .info-value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #ccc; }
   .info-value.blue { color: #7eb8ff; }
   .info-value.green { color: #51cf66; }
@@ -82,28 +72,32 @@
   .legend .end::before { background: #ff6b6b; }
   .legend .path::before { background: #4a90d9; }
 
-  #status {
-    font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px;
-    max-width: 420px; line-height: 1.4;
-  }
+  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 420px; line-height: 1.4; }
 
   .calibrating {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
-    justify-content: center; align-items: center; border-radius: 16px;
-    z-index: 10;
+    justify-content: center; align-items: center; border-radius: 16px; z-index: 10;
   }
   .calibrating.hidden { display: none; }
-  .cal-text { color: #fcc419; font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+  .cal-text { color: #fcc419; font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
   .cal-sub { color: #888; font-size: 0.8rem; }
   .cal-bar { width: 60%; height: 6px; background: #222; border-radius: 3px; margin-top: 12px; overflow: hidden; }
   .cal-fill { height: 100%; background: #fcc419; border-radius: 3px; transition: width 0.1s; width: 0%; }
+
+  .debug-section {
+    width: 100%; max-width: 420px; background: #12122a; border-radius: 10px;
+    padding: 10px 14px; border: 1px solid #1e1e40; margin-bottom: 12px;
+  }
+  .debug-title { font-size: 0.65rem; color: #555; text-transform: uppercase; margin-bottom: 6px; }
+  .debug-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: #777; margin-bottom: 2px; }
+  .debug-val { font-variant-numeric: tabular-nums; color: #999; }
 </style>
 </head>
 <body>
 
-<h1>🗺️ 运动轨迹追踪 v2</h1>
-<div class="subtitle">步态检测 + 指南针航向推算</div>
+<h1>🗺️ 运动轨迹追踪 v3</h1>
+<div class="subtitle">重力方向自适应 · 步态检测 + 指南针推算</div>
 
 <div class="controls">
   <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">授权传感器</button>
@@ -171,18 +165,32 @@
   </div>
 </div>
 
+<!-- 调试信息 -->
+<div class="debug-section" id="debugPanel">
+  <div class="debug-title">传感器调试</div>
+  <div class="debug-row"><span>重力向量 (设备系)</span><span class="debug-val" id="dbGrav">--</span></div>
+  <div class="debug-row"><span>运动加速度 (设备系)</span><span class="debug-val" id="dbMotion">--</span></div>
+  <div class="debug-row"><span>世界加速度 (N/E/Up)</span><span class="debug-val" id="dbWorld">--</span></div>
+  <div class="debug-row"><span>重力大小 |g|</span><span class="debug-val" id="dbGmag">--</span></div>
+</div>
+
 <div id="status">请先点击「授权传感器」</div>
 
 <script>
 // ============ CONFIG ============
-let MODE = 'step'; // 'step' or 'raw'
-const STEP_LENGTH = 0.70; // average step length in meters
-const STEP_THRESHOLD = 1.2; // accel magnitude threshold for step detection
-const STEP_COOLDOWN = 280; // min ms between steps
-const CAL_DURATION = 2000; // calibration time in ms
-const RAW_ACCEL_THRESHOLD = 0.15;
-const RAW_VELOCITY_DECAY = 0.985;
-const RAW_LOW_SAMPLES = 5;
+let MODE = 'step';
+const STEP_LENGTH = 0.70;
+const STEP_THRESHOLD = 1.0;
+const STEP_COOLDOWN = 280;
+const CAL_DURATION = 2000;
+
+// Raw mode
+const RAW_NOISE_GATE = 0.12;
+const RAW_VEL_DECAY = 0.985;
+const RAW_ZUPT_SAMPLES = 5;
+
+// Gravity low-pass filter coefficient (closer to 1 = smoother but slower response)
+const GRAVITY_LP = 0.95;
 
 // ============ STATE ============
 let permissionGranted = false;
@@ -191,8 +199,15 @@ let calibrating = false;
 let lastTimestamp = null;
 let startTime = 0;
 
-// Orientation
-let oriAlpha = 0, oriBeta = 0, oriGamma = 0;
+// Orientation (from DeviceOrientation, used for compass heading only)
+let oriAlpha = 0;
+
+// ====== KEY CHANGE: Gravity estimation from accelerationIncludingGravity ======
+// We use a low-pass filter on accelerationIncludingGravity to estimate gravity vector
+// Then: motionAccel = accelerationIncludingGravity - gravity
+// This works regardless of phone orientation!
+let gravX = 0, gravY = 0, gravZ = -9.8; // gravity in device frame (initial guess: phone flat)
+let gravInitialized = false;
 
 // Step detection
 let stepCount = 0;
@@ -203,13 +218,12 @@ let accelRising = false;
 // Calibration
 let calStartTime = 0;
 let calSamples = [];
-let accelBias = { x: 0, y: 0, z: 0 };
 
-// Position
+// Raw mode position
 let posX = 0, posY = 0, posZ = 0;
 let velX = 0, velY = 0, velZ = 0;
 let totalDistance = 0;
-let rawLowCount = 0;
+let rawZuptCount = 0;
 
 // Path
 let path = [];
@@ -219,11 +233,6 @@ const canvas = document.getElementById('mapCanvas');
 const ctx = canvas.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
 let lastDrawTime = 0;
-
-// High-pass filter state for raw mode
-let hpX = 0, hpY = 0, hpZ = 0;
-let prevRawX = 0, prevRawY = 0, prevRawZ = 0;
-const HP_ALPHA = 0.8;
 
 function resizeCanvas() {
   const rect = canvas.parentElement.getBoundingClientRect();
@@ -237,34 +246,57 @@ window.addEventListener('resize', resizeCanvas);
 // ============ MODE ============
 function setMode(m) {
   MODE = m;
-  document.getElementById('modeStep').classList.toggle('active', m === 'step');
-  document.getElementById('modeRaw').classList.toggle('active', m === 'raw');
+  document.getElementById('modeStep').classList.toggle('active', m==='step');
+  document.getElementById('modeRaw').classList.toggle('active', m==='raw');
 }
 
 // ============ SENSORS ============
 function handleOrientation(e) {
   oriAlpha = e.alpha || 0;
-  oriBeta = e.beta || 0;
-  oriGamma = e.gamma || 0;
-  if (!recording) {
-    document.getElementById('heading').textContent = oriAlpha.toFixed(0);
-  }
+  if (!recording) document.getElementById('heading').textContent = oriAlpha.toFixed(0);
 }
 
 function handleMotion(e) {
   const now = performance.now();
 
+  // Get raw sensor data
+  const agx = e.accelerationIncludingGravity?.x || 0;
+  const agy = e.accelerationIncludingGravity?.y || 0;
+  const agz = e.accelerationIncludingGravity?.z || 0;
+
+  // ====== Estimate gravity via low-pass filter ======
+  // accelerationIncludingGravity ≈ gravity + motion
+  // Low-pass filter extracts the slowly-changing gravity component
+  if (!gravInitialized) {
+    gravX = agx; gravY = agy; gravZ = agz;
+    gravInitialized = true;
+  } else {
+    gravX = GRAVITY_LP * gravX + (1 - GRAVITY_LP) * agx;
+    gravY = GRAVITY_LP * gravY + (1 - GRAVITY_LP) * agy;
+    gravZ = GRAVITY_LP * gravZ + (1 - GRAVITY_LP) * agz;
+  }
+
+  // ====== Motion acceleration = total - gravity ======
+  // This is equivalent to e.acceleration but computed from the actual
+  // gravity direction, so it works no matter how the phone is oriented
+  const motX = agx - gravX;
+  const motY = agy - gravY;
+  const motZ = agz - gravZ;
+
+  // Gravity magnitude (should be ~9.8)
+  const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
+
+  // Debug display
+  document.getElementById('dbGrav').textContent = `${gravX.toFixed(2)}, ${gravY.toFixed(2)}, ${gravZ.toFixed(2)}`;
+  document.getElementById('dbMotion').textContent = `${motX.toFixed(2)}, ${motY.toFixed(2)}, ${motZ.toFixed(2)}`;
+  document.getElementById('dbGmag').textContent = gMag.toFixed(3);
+
   // --- Calibration phase ---
   if (calibrating) {
-    const ax = e.accelerationIncludingGravity.x || 0;
-    const ay = e.accelerationIncludingGravity.y || 0;
-    const az = e.accelerationIncludingGravity.z || 0;
-    calSamples.push({ x: ax, y: ay, z: az });
+    calSamples.push({ gx: gravX, gy: gravY, gz: gravZ });
     const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
     document.getElementById('calFill').style.width = progress + '%';
-    if (now - calStartTime >= CAL_DURATION) {
-      finishCalibration();
-    }
+    if (now - calStartTime >= CAL_DURATION) finishCalibration();
     return;
   }
 
@@ -275,50 +307,125 @@ function handleMotion(e) {
   lastTimestamp = now;
   if (dt <= 0 || dt > 0.5) return;
 
-  const rawAx = (e.acceleration.x || 0);
-  const rawAy = (e.acceleration.y || 0);
-  const rawAz = (e.acceleration.z || 0);
+  // ====== Transform motion acceleration from device frame to world frame ======
+  // We build a rotation matrix from the gravity vector + compass heading
+  //
+  // Step 1: gravity direction gives us "down" in device frame
+  // Step 2: compass heading (oriAlpha) gives us "north" direction
+  //
+  // World frame: X=East, Y=North, Z=Up
+
+  const gLen = gMag || 9.8;
+  // Unit gravity vector in device frame (points "down" in world)
+  const gdx = gravX / gLen;
+  const gdy = gravY / gLen;
+  const gdz = gravZ / gLen;
+
+  // "Up" in device frame = -gravity direction
+  const upx = -gdx, upy = -gdy, upz = -gdz;
+
+  // We need a "North" vector in device frame.
+  // Use compass heading: alpha = angle from North, clockwise
+  // In device frame, when phone is in portrait, +Y points to the top of the phone.
+  // The heading tells us where North is relative to the phone's top.
+  //
+  // However, deriving the full North vector in device frame from alpha alone is tricky
+  // when the phone is tilted. A simpler approach:
+  //
+  // We project device-Y onto the horizontal plane (perpendicular to gravity),
+  // then rotate by the difference between the compass heading and the projection angle.
+  //
+  // Actually, the most robust approach for our use case:
+  // 1. Project motion acceleration onto the horizontal plane (remove gravity component)
+  // 2. Use compass heading to rotate horizontal components to world N/E
+
+  // Project motion accel onto gravity direction (vertical component)
+  const motDotG = motX*gdx + motY*gdy + motZ*gdz;
+  // Vertical acceleration (positive = upward)
+  const accelUp = -motDotG;
+
+  // Horizontal acceleration in device frame (subtract vertical component)
+  const hDevX = motX - motDotG * gdx;
+  const hDevY = motY - motDotG * gdy;
+  const hDevZ = motZ - motDotG * gdz;
+
+  // Now we need to map (hDevX, hDevY, hDevZ) to world (East, North).
+  // We need two horizontal basis vectors in device frame.
+  //
+  // Basis 1: "device forward projected onto horizontal" 
+  //   Device +Y axis = (0, 1, 0) in device frame
+  //   Project onto horizontal: remove gravity component
+  const fwDotG = gdy; // dot((0,1,0), gravity_unit)
+  let fwX = 0 - fwDotG * gdx;
+  let fwY = 1 - fwDotG * gdy;
+  let fwZ = 0 - fwDotG * gdz;
+  let fwLen = Math.sqrt(fwX*fwX + fwY*fwY + fwZ*fwZ);
+  if (fwLen < 0.01) {
+    // Phone is face-up or face-down, use device X instead
+    const rxDotG = gdx;
+    fwX = 1 - rxDotG * gdx;
+    fwY = 0 - rxDotG * gdy;
+    fwZ = 0 - rxDotG * gdz;
+    fwLen = Math.sqrt(fwX*fwX + fwY*fwY + fwZ*fwZ);
+  }
+  if (fwLen > 0.001) { fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen; }
+
+  // Basis 2: cross product of up × forward = "right" in horizontal plane
+  let rtX = upy*fwZ - upz*fwY;
+  let rtY = upz*fwX - upx*fwZ;
+  let rtZ = upx*fwY - upy*fwX;
+  const rtLen = Math.sqrt(rtX*rtX + rtY*rtY + rtZ*rtZ);
+  if (rtLen > 0.001) { rtX /= rtLen; rtY /= rtLen; rtZ /= rtLen; }
+
+  // Project horizontal accel onto these basis vectors
+  // "forward" component (along device top direction projected to horizontal)
+  const accelFwd = hDevX*fwX + hDevY*fwY + hDevZ*fwZ;
+  // "right" component
+  const accelRt = hDevX*rtX + hDevY*rtY + hDevZ*rtZ;
+
+  // Now rotate from device-relative (forward/right) to world (North/East) using compass
+  // oriAlpha: 0=North, 90=East, measured clockwise from North to device top
+  // "forward" direction in world = heading direction
+  const hdg = oriAlpha * Math.PI / 180;
+  const cosH = Math.cos(hdg), sinH = Math.sin(hdg);
+
+  // World North and East components
+  // Device forward -> world: North = cos(heading), East = sin(heading)
+  // Device right -> world: North = -sin(heading)... wait, let's be careful
+  // If heading=0 (device points North): forward=North, right=East ✓
+  // If heading=90 (device points East): forward=East, right=South ✓
+  const accelNorth = accelFwd * cosH - accelRt * sinH;
+  const accelEast  = accelFwd * sinH + accelRt * cosH;
+
+  // Debug
+  document.getElementById('dbWorld').textContent = `N:${accelNorth.toFixed(2)} E:${accelEast.toFixed(2)} U:${accelUp.toFixed(2)}`;
 
   if (MODE === 'step') {
-    processStepMode(rawAx, rawAy, rawAz, dt, now);
+    processStep(motX, motY, motZ, accelUp, dt, now);
   } else {
-    processRawMode(rawAx, rawAy, rawAz, dt, now);
+    processRaw(accelNorth, accelEast, accelUp, dt, now);
   }
 
   const elapsed = (now - startTime) / 1000;
   updateInfo(elapsed);
-
-  if (now - lastDrawTime > 50) {
-    lastDrawTime = now;
-    drawMap();
-  }
+  if (now - lastDrawTime > 50) { lastDrawTime = now; drawMap(); }
 }
 
 // ============ STEP MODE ============
-function processStepMode(ax, ay, az, dt, now) {
-  // Acceleration magnitude (device frame, doesn't matter for step detection)
-  const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+function processStep(motX, motY, motZ, accelUp, dt, now) {
+  const mag = Math.sqrt(motX*motX + motY*motY + motZ*motZ);
 
-  // Simple peak detection for steps
   if (mag > prevAccelMag) {
     accelRising = true;
   } else if (accelRising && prevAccelMag > STEP_THRESHOLD && (now - lastStepTime) > STEP_COOLDOWN) {
-    // Peak detected → step!
     accelRising = false;
     lastStepTime = now;
     stepCount++;
 
-    // Use compass heading (alpha) for direction
-    // alpha: 0=North, 90=East, 180=South, 270=West
-    const heading = oriAlpha * Math.PI / 180;
-
-    // Step displacement in world frame
-    // X = East (+), Y = North (+)
-    const dx = STEP_LENGTH * Math.sin(heading);
-    const dy = STEP_LENGTH * Math.cos(heading);
-
-    posX += dx;
-    posY += dy;
+    const hdg = oriAlpha * Math.PI / 180;
+    // X = East, Y = North
+    posX += STEP_LENGTH * Math.sin(hdg);
+    posY += STEP_LENGTH * Math.cos(hdg);
     totalDistance += STEP_LENGTH;
 
     const elapsed = (now - startTime) / 1000;
@@ -326,57 +433,36 @@ function processStepMode(ax, ay, az, dt, now) {
   } else if (mag < prevAccelMag) {
     accelRising = false;
   }
-
   prevAccelMag = mag;
 
-  // Vertical: simple integration on world-Z acceleration
-  const b = oriBeta * Math.PI / 180;
-  const g = oriGamma * Math.PI / 180;
-  const wz = ax * Math.cos(b) * Math.sin(g) + ay * (-Math.sin(b)) + az * Math.cos(b) * Math.cos(g);
-  const fwz = Math.abs(wz) < 0.2 ? 0 : wz;
-  velZ = velZ * 0.95 + fwz * dt;
+  // Vertical tracking
+  const fUp = Math.abs(accelUp) < 0.2 ? 0 : accelUp;
+  velZ = velZ * 0.95 + fUp * dt;
   posZ += velZ * dt;
 
   document.getElementById('heading').textContent = oriAlpha.toFixed(0);
 }
 
 // ============ RAW MODE ============
-function processRawMode(rawAx, rawAy, rawAz, dt, now) {
-  // High-pass filter to remove bias drift
-  hpX = HP_ALPHA * (hpX + rawAx - prevRawX);
-  hpY = HP_ALPHA * (hpY + rawAy - prevRawY);
-  hpZ = HP_ALPHA * (hpZ + rawAz - prevRawZ);
-  prevRawX = rawAx; prevRawY = rawAy; prevRawZ = rawAz;
+function processRaw(aN, aE, aUp, dt, now) {
+  // Noise gate
+  const fN = Math.abs(aN) < RAW_NOISE_GATE ? 0 : aN;
+  const fE = Math.abs(aE) < RAW_NOISE_GATE ? 0 : aE;
+  const fU = Math.abs(aUp) < RAW_NOISE_GATE ? 0 : aUp;
 
-  const ax = hpX - accelBias.x;
-  const ay = hpY - accelBias.y;
-  const az = hpZ - accelBias.z;
+  // Zero-velocity update
+  if (fN===0 && fE===0 && fU===0) {
+    rawZuptCount++;
+    if (rawZuptCount >= RAW_ZUPT_SAMPLES) { velX*=0.4; velY*=0.4; velZ*=0.4; }
+  } else { rawZuptCount = 0; }
 
-  // Transform to world frame
-  const a = oriAlpha * Math.PI / 180;
-  const b = oriBeta * Math.PI / 180;
-  const g = oriGamma * Math.PI / 180;
-  const cosA=Math.cos(a), sinA=Math.sin(a), cosB=Math.cos(b), sinB=Math.sin(b), cosG=Math.cos(g), sinG=Math.sin(g);
+  // Integrate: vel in world frame (X=East, Y=North, Z=Up)
+  velX = velX * RAW_VEL_DECAY + fE * dt;  // East
+  velY = velY * RAW_VEL_DECAY + fN * dt;  // North
+  velZ = velZ * RAW_VEL_DECAY + fU * dt;  // Up
 
-  const wx = ax*(cosA*cosG+sinA*sinB*sinG) + ay*(sinA*cosB) + az*(cosA*sinG-sinA*sinB*cosG);
-  const wy = ax*(-sinA*cosG+cosA*sinB*sinG) + ay*(cosA*cosB) + az*(-sinA*sinG-cosA*sinB*cosG);
-  const wz = ax*(cosB*sinG) + ay*(-sinB) + az*(cosB*cosG);
-
-  const fwx = Math.abs(wx) < RAW_ACCEL_THRESHOLD ? 0 : wx;
-  const fwy = Math.abs(wy) < RAW_ACCEL_THRESHOLD ? 0 : wy;
-  const fwz = Math.abs(wz) < RAW_ACCEL_THRESHOLD ? 0 : wz;
-
-  if (fwx===0 && fwy===0 && fwz===0) {
-    rawLowCount++;
-    if (rawLowCount >= RAW_LOW_SAMPLES) { velX*=0.4; velY*=0.4; velZ*=0.4; }
-  } else { rawLowCount = 0; }
-
-  velX = velX*RAW_VELOCITY_DECAY + fwx*dt;
-  velY = velY*RAW_VELOCITY_DECAY + fwy*dt;
-  velZ = velZ*RAW_VELOCITY_DECAY + fwz*dt;
-
-  const dxdt = velX*dt, dydt = velY*dt;
-  posX += dxdt; posY += dydt; posZ += velZ*dt;
+  const dxdt = velX * dt, dydt = velY * dt;
+  posX += dxdt; posY += dydt; posZ += velZ * dt;
   totalDistance += Math.sqrt(dxdt*dxdt + dydt*dydt);
 
   const elapsed = (now - startTime) / 1000;
@@ -398,14 +484,8 @@ function finishCalibration() {
   calibrating = false;
   document.getElementById('calOverlay').classList.add('hidden');
 
-  if (calSamples.length > 10) {
-    let sx=0, sy=0, sz=0;
-    for (const s of calSamples) { sx+=s.x; sy+=s.y; sz+=s.z; }
-    const n = calSamples.length;
-    // We only bias-correct the high-pass filtered signal in raw mode
-    // For step mode, calibration helps set a baseline
-    accelBias = { x: 0, y: 0, z: 0 }; // HP filter handles bias
-  }
+  // Use final gravity estimate (already converged via low-pass filter during calibration)
+  // No extra work needed — gravity vector is continuously updated
 
   recording = true;
   lastTimestamp = null;
@@ -423,190 +503,154 @@ function updateInfo(elapsed) {
   document.getElementById('dispX').textContent = posX.toFixed(2);
   document.getElementById('dispY').textContent = posY.toFixed(2);
   document.getElementById('dispZ').textContent = posZ.toFixed(2);
-  const speed = MODE === 'step'
-    ? (stepCount > 1 && elapsed > 0 ? totalDistance / elapsed : 0)
+  const speed = MODE==='step'
+    ? (stepCount>1 && elapsed>0 ? totalDistance/elapsed : 0)
     : Math.sqrt(velX**2 + velY**2);
   document.getElementById('curSpeed').textContent = speed.toFixed(2);
 }
 
 // ============ MAP ============
 function drawMap() {
-  const w = canvas.width / dpr;
-  const h = canvas.height / dpr;
+  const w = canvas.width / dpr, h = canvas.height / dpr;
   ctx.clearRect(0, 0, w, h);
 
-  // Grid
-  ctx.strokeStyle = '#1a1a35'; ctx.lineWidth = 0.5;
-  for (let x=0; x<w; x+=30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-  for (let y=0; y<h; y+=30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+  ctx.strokeStyle='#1a1a35'; ctx.lineWidth=0.5;
+  for(let x=0;x<w;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  for(let y=0;y<h;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
 
-  // Crosshair at center when no path
   if (path.length < 2) {
-    // Origin
-    ctx.fillStyle = '#51cf66';
-    ctx.beginPath(); ctx.arc(w/2, h/2, 6, 0, Math.PI*2); ctx.fill();
-    // Compass arrow
+    ctx.fillStyle='#51cf66'; ctx.beginPath(); ctx.arc(w/2,h/2,6,0,Math.PI*2); ctx.fill();
     if (permissionGranted) {
       const hdg = oriAlpha * Math.PI / 180;
-      ctx.strokeStyle = 'rgba(126,184,255,0.4)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(w/2, h/2);
-      ctx.lineTo(w/2 + Math.sin(hdg)*40, h/2 - Math.cos(hdg)*40);
-      ctx.stroke();
+      ctx.strokeStyle='rgba(126,184,255,0.4)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(w/2,h/2);
+      ctx.lineTo(w/2+Math.sin(hdg)*40, h/2-Math.cos(hdg)*40); ctx.stroke();
     }
-    if (!recording && path.length === 0) {
-      ctx.fillStyle = '#555'; ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('轨迹将在此处显示', w/2, h/2+30);
+    if (!recording && !path.length) {
+      ctx.fillStyle='#555'; ctx.font='13px -apple-system,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('轨迹将在此处显示',w/2,h/2+30);
     }
     return;
   }
 
-  // Bounds
-  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-  for (const p of path) {
-    if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
-    if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
-  }
-  // Ensure minimum range of 2m
-  const rX = Math.max(maxX-minX, 2), rY = Math.max(maxY-minY, 2);
-  const pad = 0.3;
-  const pMinX=minX-rX*pad, pMaxX=maxX+rX*pad, pMinY=minY-rY*pad, pMaxY=maxY+rY*pad;
-  const pRX=pMaxX-pMinX, pRY=pMaxY-pMinY;
-  const scale = Math.min(w/pRX, h/pRY);
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const p of path){if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;}
+  const rX=Math.max(maxX-minX,2), rY=Math.max(maxY-minY,2);
+  const pad=0.3;
+  const pMinX=minX-rX*pad,pMaxX=maxX+rX*pad,pMinY=minY-rY*pad,pMaxY=maxY+rY*pad;
+  const pRX=pMaxX-pMinX,pRY=pMaxY-pMinY;
+  const scale=Math.min(w/pRX,h/pRY);
   const offX=(w-pRX*scale)/2, offY=(h-pRY*scale)/2;
 
-  function toS(px,py) {
-    return { sx: offX+(px-pMinX)*scale, sy: offY+(pMaxY-py)*scale };
-  }
+  function toS(px,py){return{sx:offX+(px-pMinX)*scale, sy:offY+(pMaxY-py)*scale};}
 
   // Scale bar
-  let sbm=1, sbp=sbm*scale;
-  if(sbp<30){sbm=5;sbp=sbm*scale;}
-  if(sbp<30){sbm=10;sbp=sbm*scale;}
-  if(sbp>w*0.4){sbm=0.5;sbp=sbm*scale;}
-  if(sbp>w*0.4){sbm=0.1;sbp=sbm*scale;}
-  ctx.strokeStyle='#444'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(12,h-16); ctx.lineTo(12+sbp,h-16); ctx.stroke();
-  ctx.fillStyle='#666'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='left';
+  let sbm=1,sbp=sbm*scale;
+  if(sbp<30){sbm=5;sbp=sbm*scale;} if(sbp<30){sbm=10;sbp=sbm*scale;}
+  if(sbp>w*0.4){sbm=0.5;sbp=sbm*scale;} if(sbp>w*0.4){sbm=0.1;sbp=sbm*scale;}
+  ctx.strokeStyle='#444';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(12,h-16);ctx.lineTo(12+sbp,h-16);ctx.stroke();
+  ctx.fillStyle='#666';ctx.font='10px -apple-system,sans-serif';ctx.textAlign='left';
   ctx.fillText(sbm+' m',12,h-22);
 
-  // Downsample for perf
-  const maxPts = 600;
-  const step = Math.max(1, Math.floor(path.length/maxPts));
-  const sampled = [];
-  for(let i=0; i<path.length; i+=step) sampled.push(path[i]);
-  if(sampled[sampled.length-1]!==path[path.length-1]) sampled.push(path[path.length-1]);
+  // Downsample
+  const maxPts=600, step=Math.max(1,Math.floor(path.length/maxPts));
+  const sampled=[];
+  for(let i=0;i<path.length;i+=step)sampled.push(path[i]);
+  if(sampled[sampled.length-1]!==path[path.length-1])sampled.push(path[path.length-1]);
 
-  // Draw path
-  ctx.lineWidth = 3; ctx.lineJoin='round'; ctx.lineCap='round';
-  for(let i=1; i<sampled.length; i++) {
-    const ratio = i/(sampled.length-1);
-    const r=Math.round(60+ratio*120), g=Math.round(130+ratio*80), b=Math.min(Math.round(220+ratio*30),255);
-    ctx.strokeStyle = `rgba(${r},${g},${b},${0.5+ratio*0.5})`;
-    const p0=toS(sampled[i-1].x,sampled[i-1].y), p1=toS(sampled[i].x,sampled[i].y);
-    ctx.beginPath(); ctx.moveTo(p0.sx,p0.sy); ctx.lineTo(p1.sx,p1.sy); ctx.stroke();
+  // Path
+  ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';
+  for(let i=1;i<sampled.length;i++){
+    const ratio=i/(sampled.length-1);
+    const r=Math.round(60+ratio*120),g=Math.round(130+ratio*80),b=Math.min(Math.round(220+ratio*30),255);
+    ctx.strokeStyle=`rgba(${r},${g},${b},${0.5+ratio*0.5})`;
+    const p0=toS(sampled[i-1].x,sampled[i-1].y),p1=toS(sampled[i].x,sampled[i].y);
+    ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
   }
 
-  // Step dots in step mode
-  if (MODE === 'step' && path.length < 200) {
-    ctx.fillStyle = 'rgba(126,184,255,0.5)';
-    for (const p of path) {
-      const sp = toS(p.x, p.y);
-      ctx.beginPath(); ctx.arc(sp.sx, sp.sy, 3, 0, Math.PI*2); ctx.fill();
-    }
+  // Step dots
+  if(MODE==='step'&&path.length<200){
+    ctx.fillStyle='rgba(126,184,255,0.5)';
+    for(const p of path){const sp=toS(p.x,p.y);ctx.beginPath();ctx.arc(sp.sx,sp.sy,3,0,Math.PI*2);ctx.fill();}
   }
 
   // Start
-  const sp = toS(path[0].x, path[0].y);
-  ctx.fillStyle='#51cf66'; ctx.beginPath(); ctx.arc(sp.sx,sp.sy,8,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const sp=toS(path[0].x,path[0].y);
+  ctx.fillStyle='#51cf66';ctx.beginPath();ctx.arc(sp.sx,sp.sy,8,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillText('S',sp.sx,sp.sy);
 
   // End
-  const last = path[path.length-1];
-  const ep = toS(last.x, last.y);
-  ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep.sx,ep.sy,8,0,Math.PI*2); ctx.fill();
+  const last=path[path.length-1], ep=toS(last.x,last.y);
+  ctx.fillStyle='#ff6b6b';ctx.beginPath();ctx.arc(ep.sx,ep.sy,8,0,Math.PI*2);ctx.fill();
 
-  // Heading arrow at end
-  const hdg = oriAlpha * Math.PI / 180;
-  ctx.strokeStyle='rgba(255,107,107,0.8)'; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.moveTo(ep.sx, ep.sy);
-  ctx.lineTo(ep.sx + Math.sin(hdg)*18, ep.sy - Math.cos(hdg)*18); ctx.stroke();
+  // Heading arrow
+  const hdg=oriAlpha*Math.PI/180;
+  ctx.strokeStyle='rgba(255,107,107,0.8)';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(ep.sx,ep.sy);
+  ctx.lineTo(ep.sx+Math.sin(hdg)*18,ep.sy-Math.cos(hdg)*18);ctx.stroke();
 
   // North
-  ctx.fillStyle='#555'; ctx.font='11px -apple-system,sans-serif'; ctx.textAlign='right';
+  ctx.fillStyle='#555';ctx.font='11px -apple-system,sans-serif';ctx.textAlign='right';
   ctx.fillText('↑ N',w-10,18);
 
-  // Return line (dashed)
-  const dist = Math.sqrt((last.x-path[0].x)**2 + (last.y-path[0].y)**2);
-  if (dist > 0.2) {
-    ctx.setLineDash([4,4]); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(sp.sx,sp.sy); ctx.lineTo(ep.sx,ep.sy); ctx.stroke();
+  // Return line
+  const dist=Math.sqrt((last.x-path[0].x)**2+(last.y-path[0].y)**2);
+  if(dist>0.2){
+    ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(sp.sx,sp.sy);ctx.lineTo(ep.sx,ep.sy);ctx.stroke();
     ctx.setLineDash([]);
-    // Distance label
-    const mx=(sp.sx+ep.sx)/2, my=(sp.sy+ep.sy)/2;
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='center';
-    ctx.fillText(dist.toFixed(1)+'m', mx, my-6);
+    const mx=(sp.sx+ep.sx)/2,my=(sp.sy+ep.sy)/2;
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px -apple-system,sans-serif';ctx.textAlign='center';
+    ctx.fillText(dist.toFixed(1)+'m',mx,my-6);
   }
 }
 
 // ============ CONTROLS ============
 function requestPermission() {
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    Promise.all([
-      DeviceMotionEvent.requestPermission(),
-      DeviceOrientationEvent.requestPermission()
-    ]).then(([ms,os]) => {
-      if(ms==='granted'&&os==='granted') onPermGranted();
+  if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
+    Promise.all([DeviceMotionEvent.requestPermission(),DeviceOrientationEvent.requestPermission()])
+    .then(([ms,os])=>{
+      if(ms==='granted'&&os==='granted')onPermGranted();
       else document.getElementById('status').textContent='❌ 权限被拒绝';
-    }).catch(err => {
-      document.getElementById('status').textContent='❌ '+err.message;
-    });
-  } else {
-    onPermGranted();
-  }
+    }).catch(err=>{document.getElementById('status').textContent='❌ '+err.message;});
+  } else { onPermGranted(); }
 }
 
 function onPermGranted() {
-  permissionGranted = true;
-  window.addEventListener('deviceorientation', handleOrientation, true);
-  window.addEventListener('devicemotion', handleMotion, true);
+  permissionGranted=true;
+  window.addEventListener('deviceorientation',handleOrientation,true);
+  window.addEventListener('devicemotion',handleMotion,true);
   document.getElementById('permBtn').disabled=true;
   document.getElementById('permBtn').textContent='✅ 已授权';
   document.getElementById('startBtn').disabled=false;
-  document.getElementById('status').textContent='传感器就绪。点击「开始」后请将手机静置 2 秒进行校准。';
+  document.getElementById('status').textContent='传感器就绪。点击「开始」后请静置手机 2 秒校准。';
 }
 
-function startRecording() {
-  if(!permissionGranted) return;
-  startCalibration();
-}
+function startRecording(){if(!permissionGranted)return; startCalibration();}
 
 function stopRecording() {
-  recording = false;
+  recording=false;
   document.getElementById('startBtn').disabled=false;
   document.getElementById('stopBtn').disabled=true;
   drawMap();
-  const elapsed = path.length>0 ? path[path.length-1].t : 0;
-  const info = MODE==='step'
-    ? `共 ${stepCount} 步，${totalDistance.toFixed(2)} 米`
-    : `共 ${path.length} 个采样点，${totalDistance.toFixed(2)} 米`;
-  document.getElementById('status').textContent=`✅ 记录完成！${info}，${elapsed.toFixed(1)} 秒`;
+  const elapsed=path.length>0?path[path.length-1].t:0;
+  const info=MODE==='step'?`共 ${stepCount} 步，${totalDistance.toFixed(2)} 米`:`共 ${path.length} 点，${totalDistance.toFixed(2)} 米`;
+  document.getElementById('status').textContent=`✅ 完成！${info}，${elapsed.toFixed(1)} 秒`;
 }
 
 function resetAll() {
-  recording=false; calibrating=false; lastTimestamp=null;
+  recording=false;calibrating=false;lastTimestamp=null;
   posX=0;posY=0;posZ=0;velX=0;velY=0;velZ=0;
-  path=[]; totalDistance=0; stepCount=0; rawLowCount=0;
-  prevAccelMag=0; accelRising=false; lastStepTime=0;
-  hpX=0;hpY=0;hpZ=0;prevRawX=0;prevRawY=0;prevRawZ=0;
-  accelBias={x:0,y:0,z:0};
+  path=[];totalDistance=0;stepCount=0;rawZuptCount=0;
+  prevAccelMag=0;accelRising=false;lastStepTime=0;
   document.getElementById('calOverlay').classList.add('hidden');
   document.getElementById('startBtn').disabled=!permissionGranted;
   document.getElementById('stopBtn').disabled=true;
   ['totalDist','dispX','dispY','dispZ','curSpeed'].forEach(id=>document.getElementById(id).textContent='0.00');
   document.getElementById('totalTime').textContent='0.0';
   document.getElementById('stepCount').textContent='0';
-  document.getElementById('stepLen').textContent=STEP_LENGTH.toFixed(2);
   document.getElementById('status').textContent=permissionGranted?'已重置':'请先授权传感器';
   drawMap();
 }
