@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>运动轨迹追踪 v3</title>
+<title>Yaw Rotation Viewer</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -12,470 +12,456 @@
     min-height: 100vh; display: flex; flex-direction: column; align-items: center;
     padding: 16px; overflow-x: hidden;
   }
-  h1 { font-size: 1.3rem; margin-bottom: 6px; color: #7eb8ff; text-align: center; }
-  .subtitle { font-size: 0.72rem; color: #666; margin-bottom: 12px; text-align: center; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; color: #7eb8ff; text-align: center; }
+  .subtitle { font-size: 0.72rem; color: #666; margin-bottom: 14px; text-align: center; }
 
-  .controls { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
   .btn {
-    border: none; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;
+    border: none; padding: 14px 36px; border-radius: 12px; font-size: 1rem;
     font-weight: 600; cursor: pointer; color: white; transition: transform 0.15s, opacity 0.2s;
+    margin-bottom: 16px;
   }
   .btn:active { transform: scale(0.96); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-start { background: linear-gradient(135deg, #51cf66, #37b24d); }
-  .btn-stop { background: linear-gradient(135deg, #ff6b6b, #e03131); }
-  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
   .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
+  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); font-size: 0.85rem; padding: 10px 24px; }
+  .controls { display: flex; gap: 10px; margin-bottom: 14px; }
 
-  .mode-toggle {
-    width: 100%; max-width: 420px; display: flex;
-    margin-bottom: 12px; border-radius: 10px; overflow: hidden; border: 1px solid #1e1e40;
+  /* Panoramic strip */
+  .pano-wrapper {
+    width: 100%; max-width: 440px; height: 200px;
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid #1e1e40; margin-bottom: 16px;
+    position: relative; background: #0d0d24;
   }
-  .mode-btn {
-    flex: 1; padding: 10px; text-align: center; font-size: 0.78rem; font-weight: 600;
-    background: #12122a; color: #666; border: none; cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+  .pano-strip {
+    position: absolute; top: 0; left: 0;
+    height: 100%; display: flex;
+    transition: transform 0.08s ease-out;
+    will-change: transform;
   }
-  .mode-btn.active { background: #1e3a5f; color: #7eb8ff; }
+  .pano-segment {
+    height: 100%; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: center;
+    padding-bottom: 12px; position: relative;
+  }
+  .pano-segment .deg-label {
+    font-size: 0.7rem; color: rgba(255,255,255,0.4);
+    font-weight: 600; position: absolute; bottom: 6px;
+  }
+  .pano-segment .dir-label {
+    font-size: 1rem; font-weight: 700; position: absolute; bottom: 22px;
+  }
+  .pano-segment .tick {
+    position: absolute; top: 0; left: 50%; width: 1px;
+    background: rgba(255,255,255,0.1); transform: translateX(-50%);
+  }
+  .pano-segment .tick.major { background: rgba(255,255,255,0.25); width: 2px; }
 
-  .map-container {
-    width: 100%; max-width: 420px; aspect-ratio: 1;
-    background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
-    position: relative; overflow: hidden; margin-bottom: 12px;
+  /* Center indicator */
+  .pano-indicator {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 3px; height: 100%; background: #ff6b6b;
+    z-index: 10; pointer-events: none;
   }
-  canvas { width: 100%; height: 100%; display: block; }
+  .pano-indicator::after {
+    content: '▼'; position: absolute; top: -2px; left: 50%;
+    transform: translateX(-50%); color: #ff6b6b; font-size: 14px;
+  }
 
-  .info-grid {
-    width: 100%; max-width: 420px;
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;
+  /* Compass dial */
+  .compass-container {
+    width: 220px; height: 220px; position: relative;
+    margin-bottom: 16px;
+  }
+  .compass-ring {
+    width: 100%; height: 100%; border-radius: 50%;
+    border: 2px solid #1e1e40; background: #0d0d24;
+    position: relative;
+    transition: transform 0.08s ease-out;
+    will-change: transform;
+  }
+  .compass-label {
+    position: absolute; font-weight: 700; font-size: 0.85rem;
+    transform: translate(-50%, -50%);
+  }
+  .compass-tick {
+    position: absolute; top: 50%; left: 50%;
+    transform-origin: 0 0;
+    width: 1px; background: rgba(255,255,255,0.15);
+  }
+  .compass-tick.major { background: rgba(255,255,255,0.3); width: 2px; }
+  .compass-needle {
+    position: absolute; top: 50%; left: 50%;
+    width: 3px; height: 90px; background: #ff6b6b;
+    transform: translate(-50%, -100%);
+    border-radius: 2px;
+    z-index: 5;
+  }
+  .compass-needle::after {
+    content: ''; position: absolute; bottom: -6px; left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #ff6b6b;
+  }
+  .compass-center {
+    position: absolute; top: 50%; left: 50%;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #222; border: 2px solid #555;
+    transform: translate(-50%, -50%); z-index: 6;
+  }
+
+  /* Info cards */
+  .info-row {
+    width: 100%; max-width: 440px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;
   }
   .info-card {
-    background: #12122a; border-radius: 10px; padding: 10px;
+    background: #12122a; border-radius: 10px; padding: 12px;
     border: 1px solid #1e1e40; text-align: center;
   }
   .info-label { font-size: 0.63rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-  .info-value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #ccc; }
-  .info-value.blue { color: #7eb8ff; }
-  .info-value.green { color: #51cf66; }
-  .info-value.red { color: #ff6b6b; }
-  .info-value.yellow { color: #fcc419; }
+  .info-value { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #7eb8ff; }
+  .info-value.small { font-size: 1rem; color: #999; }
 
-  .legend {
-    width: 100%; max-width: 420px; display: flex; justify-content: center;
-    gap: 16px; font-size: 0.72rem; color: #666; margin-bottom: 8px;
-  }
-  .legend span::before {
-    content: ''; display: inline-block; width: 10px; height: 10px;
-    border-radius: 50%; margin-right: 4px; vertical-align: middle;
-  }
-  .legend .start::before { background: #51cf66; }
-  .legend .end::before { background: #ff6b6b; }
-  .legend .path::before { background: #4a90d9; }
+  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 440px; line-height: 1.4; }
 
-  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 420px; line-height: 1.4; }
-
-  .calibrating {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
-    justify-content: center; align-items: center; border-radius: 16px; z-index: 10;
+  /* Calibration overlay */
+  .cal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
+    justify-content: center; align-items: center; z-index: 100;
+    padding: 30px;
   }
-  .calibrating.hidden { display: none; }
-  .cal-text { color: #fcc419; font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
-  .cal-sub { color: #888; font-size: 0.8rem; }
-  .cal-bar { width: 60%; height: 6px; background: #222; border-radius: 3px; margin-top: 12px; overflow: hidden; }
-  .cal-fill { height: 100%; background: #fcc419; border-radius: 3px; transition: width 0.1s; width: 0%; }
-
-  .debug-section {
-    width: 100%; max-width: 420px; background: #12122a; border-radius: 10px;
-    padding: 10px 14px; border: 1px solid #1e1e40; margin-bottom: 12px;
-  }
-  .debug-title { font-size: 0.65rem; color: #555; text-transform: uppercase; margin-bottom: 6px; }
-  .debug-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: #777; margin-bottom: 2px; }
-  .debug-val { font-variant-numeric: tabular-nums; color: #999; }
+  .cal-overlay.hidden { display: none; }
+  .cal-icon { font-size: 3rem; margin-bottom: 16px; }
+  .cal-title { color: #fcc419; font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
+  .cal-desc { color: #888; font-size: 0.9rem; text-align: center; line-height: 1.5; margin-bottom: 20px; max-width: 300px; }
+  .cal-bar { width: 200px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+  .cal-fill { height: 100%; background: #fcc419; border-radius: 4px; transition: width 0.1s; width: 0%; }
+  .cal-status { color: #aaa; font-size: 0.8rem; }
 </style>
 </head>
 <body>
 
-<h1>🗺️ 运动轨迹追踪 v3</h1>
-<div class="subtitle">重力方向自适应 · 步态检测 + 指南针推算</div>
+<h1>🧭 Yaw Rotation Viewer</h1>
+<div class="subtitle">Rotation around gravity axis · Calibrated measurement</div>
 
 <div class="controls">
-  <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">授权传感器</button>
-  <button class="btn btn-start" id="startBtn" onclick="startRecording()" disabled>▶ 开始</button>
-  <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>⏹ 停止</button>
-  <button class="btn btn-reset" id="resetBtn" onclick="resetAll()">↻ 重置</button>
+  <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
+  <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Recalibrate</button>
 </div>
 
-<div class="mode-toggle">
-  <button class="mode-btn active" id="modeStep" onclick="setMode('step')">步态模式（推荐）</button>
-  <button class="mode-btn" id="modeRaw" onclick="setMode('raw')">原始积分模式</button>
+<!-- Panoramic scrolling strip -->
+<div class="pano-wrapper" id="panoWrapper">
+  <div class="pano-indicator"></div>
+  <div class="pano-strip" id="panoStrip"></div>
 </div>
 
-<div class="legend">
-  <span class="start">起点</span>
-  <span class="path">轨迹</span>
-  <span class="end">当前</span>
+<!-- Compass dial -->
+<div class="compass-container">
+  <div class="compass-ring" id="compassRing"></div>
+  <div class="compass-needle" id="compassNeedle" style="transform: translate(-50%, -100%) rotate(0deg);"></div>
+  <div class="compass-center"></div>
 </div>
 
-<div class="map-container">
-  <canvas id="mapCanvas"></canvas>
-  <div class="calibrating hidden" id="calOverlay">
-    <div class="cal-text">📐 校准中...</div>
-    <div class="cal-sub">请将手机静置 2 秒</div>
-    <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
-  </div>
-</div>
-
-<div class="info-grid">
+<!-- Info -->
+<div class="info-row">
   <div class="info-card">
-    <div class="info-label">步数</div>
-    <div class="info-value yellow" id="stepCount">0</div>
+    <div class="info-label">Yaw Angle</div>
+    <div class="info-value" id="yawAngle">0.0°</div>
   </div>
   <div class="info-card">
-    <div class="info-label">距离 (m)</div>
-    <div class="info-value blue" id="totalDist">0.00</div>
+    <div class="info-label">Rotation Rate</div>
+    <div class="info-value small" id="yawRate">0.0 °/s</div>
   </div>
   <div class="info-card">
-    <div class="info-label">时间 (s)</div>
-    <div class="info-value" id="totalTime">0.0</div>
-  </div>
-  <div class="info-card">
-    <div class="info-label">位移 X (m)</div>
-    <div class="info-value green" id="dispX">0.00</div>
-  </div>
-  <div class="info-card">
-    <div class="info-label">位移 Y (m)</div>
-    <div class="info-value green" id="dispY">0.00</div>
-  </div>
-  <div class="info-card">
-    <div class="info-label">高度 Δ (m)</div>
-    <div class="info-value red" id="dispZ">0.00</div>
-  </div>
-  <div class="info-card">
-    <div class="info-label">航向 (°)</div>
-    <div class="info-value" id="heading">--</div>
-  </div>
-  <div class="info-card">
-    <div class="info-label">步长 (m)</div>
-    <div class="info-value" id="stepLen">0.70</div>
-  </div>
-  <div class="info-card">
-    <div class="info-label">速度 (m/s)</div>
-    <div class="info-value" id="curSpeed">0.00</div>
+    <div class="info-label">|g| Check</div>
+    <div class="info-value small" id="gCheck">--</div>
   </div>
 </div>
 
-<!-- 调试信息 -->
-<div class="debug-section" id="debugPanel">
-  <div class="debug-title">传感器调试</div>
-  <div class="debug-row"><span>重力向量 (设备系)</span><span class="debug-val" id="dbGrav">--</span></div>
-  <div class="debug-row"><span>运动加速度 (设备系)</span><span class="debug-val" id="dbMotion">--</span></div>
-  <div class="debug-row"><span>世界加速度 (N/E/Up)</span><span class="debug-val" id="dbWorld">--</span></div>
-  <div class="debug-row"><span>重力大小 |g|</span><span class="debug-val" id="dbGmag">--</span></div>
-</div>
+<div id="status">Tap "Grant Sensors" to begin</div>
 
-<div id="status">请先点击「授权传感器」</div>
+<!-- Calibration overlay -->
+<div class="cal-overlay hidden" id="calOverlay">
+  <div class="cal-icon">📐</div>
+  <div class="cal-title">Calibrating Gravity Vector</div>
+  <div class="cal-desc">
+    Hold your phone still in any position for 3 seconds.<br>
+    The phone does NOT need to be level — just keep it steady.
+  </div>
+  <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
+  <div class="cal-status" id="calStatus">Collecting samples...</div>
+</div>
 
 <script>
 // ============ CONFIG ============
-let MODE = 'step';
-const STEP_LENGTH = 0.70;
-const STEP_THRESHOLD = 1.0;
-const STEP_COOLDOWN = 280;
-const CAL_DURATION = 2000;
-
-// Raw mode
-const RAW_NOISE_GATE = 0.12;
-const RAW_VEL_DECAY = 0.985;
-const RAW_ZUPT_SAMPLES = 5;
-
-// Gravity low-pass filter coefficient (closer to 1 = smoother but slower response)
-const GRAVITY_LP = 0.95;
+const CAL_DURATION = 3000; // 3 seconds calibration
+const CAL_MIN_SAMPLES = 50;
+const GYRO_LP = 0.15; // low-pass for yaw rate display smoothing
+const PANO_DEG_PER_PX = 1.0; // 1 degree = 1 px width
 
 // ============ STATE ============
 let permissionGranted = false;
-let recording = false;
+let calibrated = false;
 let calibrating = false;
-let lastTimestamp = null;
-let startTime = 0;
 
-// Orientation (from DeviceOrientation, used for compass heading only)
-let oriAlpha = 0;
-
-// ====== KEY CHANGE: Gravity estimation from accelerationIncludingGravity ======
-// We use a low-pass filter on accelerationIncludingGravity to estimate gravity vector
-// Then: motionAccel = accelerationIncludingGravity - gravity
-// This works regardless of phone orientation!
-let gravX = 0, gravY = 0, gravZ = -9.8; // gravity in device frame (initial guess: phone flat)
-let gravInitialized = false;
-
-// Step detection
-let stepCount = 0;
-let lastStepTime = 0;
-let prevAccelMag = 0;
-let accelRising = false;
-
-// Calibration
+// Calibration data
 let calStartTime = 0;
-let calSamples = [];
+let calAccelSamples = [];
 
-// Raw mode position
-let posX = 0, posY = 0, posZ = 0;
-let velX = 0, velY = 0, velZ = 0;
-let totalDistance = 0;
-let rawZuptCount = 0;
+// Calibrated gravity unit vector in device frame
+let gUnitX = 0, gUnitY = 0, gUnitZ = -1; // default: phone flat, screen up
 
-// Path
-let path = [];
+// Yaw tracking via gyroscope integration
+// We integrate the component of rotationRate that is along the gravity axis
+let yawAngle = 0; // degrees, accumulated
+let yawRate = 0;   // current rate °/s (smoothed)
+let lastMotionTime = null;
 
-// Canvas
-const canvas = document.getElementById('mapCanvas');
-const ctx = canvas.getContext('2d');
-const dpr = window.devicePixelRatio || 1;
-let lastDrawTime = 0;
+// For gravity vector continuous update (low-pass from accelerationIncludingGravity)
+let gravX = 0, gravY = 0, gravZ = -9.8;
+let gravInited = false;
+const GRAV_LP = 0.97;
 
-function resizeCanvas() {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawMap();
+// Panoramic strip
+let panoWidth = 0;
+const TOTAL_DEG = 360;
+
+// ============ BUILD UI ============
+function buildPanoStrip() {
+  const wrapper = document.getElementById('panoWrapper');
+  const wrapperWidth = wrapper.clientWidth;
+  const strip = document.getElementById('panoStrip');
+  strip.innerHTML = '';
+
+  // We render 3x 360° so we can wrap seamlessly
+  const degsPerSegment = 10;
+  const segWidth = degsPerSegment / PANO_DEG_PER_PX;
+  const totalSegs = (360 / degsPerSegment) * 3;
+
+  const directions = {
+    0: { label: 'N', color: '#ff6b6b' },
+    45: { label: 'NE', color: '#aaa' },
+    90: { label: 'E', color: '#7eb8ff' },
+    135: { label: 'SE', color: '#aaa' },
+    180: { label: 'S', color: '#51cf66' },
+    225: { label: 'SW', color: '#aaa' },
+    270: { label: 'W', color: '#fcc419' },
+    315: { label: 'NW', color: '#aaa' },
+  };
+
+  // Colors for sky gradient per direction
+  const skyColors = {
+    0:   ['#1a0a2e', '#2d1b4e'], // N - deep purple
+    45:  ['#1a1a2e', '#2b2040'],
+    90:  ['#0a1628', '#1a3050'], // E - blue
+    135: ['#0a1a20', '#1a3040'],
+    180: ['#0a2018', '#1a4030'], // S - green tint
+    225: ['#1a1a10', '#302a18'],
+    270: ['#28180a', '#4a3018'], // W - warm
+    315: ['#201018', '#3a1a28'],
+  };
+
+  for (let i = 0; i < totalSegs; i++) {
+    const deg = (i * degsPerSegment) % 360;
+    const seg = document.createElement('div');
+    seg.className = 'pano-segment';
+    seg.style.width = segWidth + 'px';
+
+    // Background gradient based on direction
+    const nearest = Math.round(deg / 45) * 45 % 360;
+    const colors = skyColors[nearest] || ['#111', '#222'];
+    seg.style.background = `linear-gradient(to bottom, ${colors[0]}, ${colors[1]})`;
+
+    // Tick mark
+    const tick = document.createElement('div');
+    tick.className = 'tick';
+    const isMajor = deg % 30 === 0;
+    if (isMajor) tick.classList.add('major');
+    tick.style.height = isMajor ? '100%' : '40%';
+    seg.appendChild(tick);
+
+    // Degree label every 30°
+    if (deg % 30 === 0) {
+      const dl = document.createElement('div');
+      dl.className = 'deg-label';
+      dl.textContent = deg + '°';
+      seg.appendChild(dl);
+    }
+
+    // Direction label
+    if (directions[deg]) {
+      const dl = document.createElement('div');
+      dl.className = 'dir-label';
+      dl.style.color = directions[deg].color;
+      dl.textContent = directions[deg].label;
+      seg.appendChild(dl);
+
+      // Landmark silhouettes
+      if (deg === 0) { // N - mountain
+        seg.innerHTML += `<svg style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0.2" width="60" height="30"><polygon points="0,30 15,5 30,20 45,2 60,30" fill="#ff6b6b"/></svg>`;
+      } else if (deg === 90) { // E - building
+        seg.innerHTML += `<svg style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0.2" width="40" height="40"><rect x="5" y="0" width="12" height="40" fill="#7eb8ff"/><rect x="22" y="10" width="14" height="30" fill="#7eb8ff"/></svg>`;
+      } else if (deg === 180) { // S - tree
+        seg.innerHTML += `<svg style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);opacity:0.2" width="40" height="40"><circle cx="20" cy="10" r="12" fill="#51cf66"/><rect x="18" y="20" width="4" height="20" fill="#51cf66"/></svg>`;
+      } else if (deg === 270) { // W - sun
+        seg.innerHTML += `<svg style="position:absolute;bottom:55px;left:50%;transform:translateX(-50%);opacity:0.2" width="36" height="36"><circle cx="18" cy="18" r="10" fill="none" stroke="#fcc419" stroke-width="2"/><circle cx="18" cy="18" r="5" fill="#fcc419"/></svg>`;
+      }
+    }
+
+    strip.appendChild(seg);
+  }
+
+  panoWidth = segWidth * (360 / degsPerSegment); // width of one 360° cycle
 }
-window.addEventListener('resize', resizeCanvas);
 
-// ============ MODE ============
-function setMode(m) {
-  MODE = m;
-  document.getElementById('modeStep').classList.toggle('active', m==='step');
-  document.getElementById('modeRaw').classList.toggle('active', m==='raw');
+function buildCompass() {
+  const ring = document.getElementById('compassRing');
+  ring.innerHTML = '';
+  const r = 108; // ring radius (half of 220 - border)
+  const dirs = [
+    { deg: 0, label: 'N', color: '#ff6b6b' },
+    { deg: 90, label: 'E', color: '#7eb8ff' },
+    { deg: 180, label: 'S', color: '#51cf66' },
+    { deg: 270, label: 'W', color: '#fcc419' },
+  ];
+
+  // Tick marks
+  for (let d = 0; d < 360; d += 10) {
+    const isMajor = d % 30 === 0;
+    const rad = d * Math.PI / 180;
+    const innerR = isMajor ? r - 18 : r - 10;
+    const outerR = r - 2;
+    const tick = document.createElement('div');
+    tick.className = 'compass-tick' + (isMajor ? ' major' : '');
+    tick.style.position = 'absolute';
+    tick.style.width = (isMajor ? 2 : 1) + 'px';
+    tick.style.height = (outerR - innerR) + 'px';
+    tick.style.left = '50%';
+    tick.style.top = '50%';
+    tick.style.transformOrigin = '50% 0';
+    tick.style.transform = `translate(-50%, 0) rotate(${d}deg) translateY(-${outerR}px)`;
+    tick.style.background = isMajor ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    ring.appendChild(tick);
+  }
+
+  // Direction labels
+  for (const dir of dirs) {
+    const rad = dir.deg * Math.PI / 180;
+    const labelR = r - 30;
+    const lbl = document.createElement('div');
+    lbl.className = 'compass-label';
+    lbl.style.color = dir.color;
+    lbl.style.left = (50 + (labelR / r) * 50 * Math.sin(rad)) + '%';
+    lbl.style.top = (50 - (labelR / r) * 50 * Math.cos(rad)) + '%';
+    lbl.textContent = dir.label;
+    ring.appendChild(lbl);
+  }
+}
+
+// ============ PANORAMIC UPDATE ============
+function updatePano(deg) {
+  const wrapper = document.getElementById('panoWrapper');
+  const wrapperWidth = wrapper.clientWidth;
+  const strip = document.getElementById('panoStrip');
+
+  // Normalize to 0-360
+  let d = ((deg % 360) + 360) % 360;
+
+  // Convert degrees to pixels, center the current degree
+  const px = (d / PANO_DEG_PER_PX);
+  // Offset by one full cycle so we're in the middle copy
+  const offset = panoWidth + px - wrapperWidth / 2;
+  strip.style.transform = `translateX(${-offset}px)`;
+}
+
+function updateCompass(deg) {
+  // Ring rotates opposite to show current heading at top
+  const ring = document.getElementById('compassRing');
+  ring.style.transform = `rotate(${-deg}deg)`;
 }
 
 // ============ SENSORS ============
-function handleOrientation(e) {
-  oriAlpha = e.alpha || 0;
-  if (!recording) document.getElementById('heading').textContent = oriAlpha.toFixed(0);
-}
-
 function handleMotion(e) {
   const now = performance.now();
 
-  // Get raw sensor data
+  // Update gravity estimate from accelerationIncludingGravity
   const agx = e.accelerationIncludingGravity?.x || 0;
   const agy = e.accelerationIncludingGravity?.y || 0;
   const agz = e.accelerationIncludingGravity?.z || 0;
 
-  // ====== Estimate gravity via low-pass filter ======
-  // accelerationIncludingGravity ≈ gravity + motion
-  // Low-pass filter extracts the slowly-changing gravity component
-  if (!gravInitialized) {
+  if (!gravInited) {
     gravX = agx; gravY = agy; gravZ = agz;
-    gravInitialized = true;
+    gravInited = true;
   } else {
-    gravX = GRAVITY_LP * gravX + (1 - GRAVITY_LP) * agx;
-    gravY = GRAVITY_LP * gravY + (1 - GRAVITY_LP) * agy;
-    gravZ = GRAVITY_LP * gravZ + (1 - GRAVITY_LP) * agz;
+    gravX = GRAV_LP * gravX + (1 - GRAV_LP) * agx;
+    gravY = GRAV_LP * gravY + (1 - GRAV_LP) * agy;
+    gravZ = GRAV_LP * gravZ + (1 - GRAV_LP) * agz;
   }
 
-  // ====== Motion acceleration = total - gravity ======
-  // This is equivalent to e.acceleration but computed from the actual
-  // gravity direction, so it works no matter how the phone is oriented
-  const motX = agx - gravX;
-  const motY = agy - gravY;
-  const motZ = agz - gravZ;
-
-  // Gravity magnitude (should be ~9.8)
   const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
-
-  // Debug display
-  document.getElementById('dbGrav').textContent = `${gravX.toFixed(2)}, ${gravY.toFixed(2)}, ${gravZ.toFixed(2)}`;
-  document.getElementById('dbMotion').textContent = `${motX.toFixed(2)}, ${motY.toFixed(2)}, ${motZ.toFixed(2)}`;
-  document.getElementById('dbGmag').textContent = gMag.toFixed(3);
+  document.getElementById('gCheck').textContent = gMag.toFixed(2);
 
   // --- Calibration phase ---
   if (calibrating) {
-    calSamples.push({ gx: gravX, gy: gravY, gz: gravZ });
+    calAccelSamples.push({ x: agx, y: agy, z: agz });
     const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
     document.getElementById('calFill').style.width = progress + '%';
+    document.getElementById('calStatus').textContent =
+      `Collecting... ${calAccelSamples.length} samples`;
     if (now - calStartTime >= CAL_DURATION) finishCalibration();
     return;
   }
 
-  if (!recording) return;
-  if (lastTimestamp === null) { lastTimestamp = now; return; }
+  if (!calibrated) return;
 
-  const dt = (now - lastTimestamp) / 1000;
-  lastTimestamp = now;
-  if (dt <= 0 || dt > 0.5) return;
+  // --- Yaw integration from gyroscope ---
+  const rr = e.rotationRate;
+  if (!rr) return;
 
-  // ====== Transform motion acceleration from device frame to world frame ======
-  // We build a rotation matrix from the gravity vector + compass heading
-  //
-  // Step 1: gravity direction gives us "down" in device frame
-  // Step 2: compass heading (oriAlpha) gives us "north" direction
-  //
-  // World frame: X=East, Y=North, Z=Up
+  // rotationRate is in °/s in device frame: alpha(Z), beta(X), gamma(Y)
+  // We need the component along the gravity axis
+  // rotationRate gives angular velocity around device axes:
+  //   rr.alpha = rotation around device Z axis (°/s)
+  //   rr.beta  = rotation around device X axis (°/s)
+  //   rr.gamma = rotation around device Y axis (°/s)
+  // Convert to rad/s vector in device frame
+  const wrx = (rr.beta  || 0); // around device X
+  const wry = (rr.gamma || 0); // around device Y
+  const wrz = (rr.alpha || 0); // around device Z
 
-  const gLen = gMag || 9.8;
-  // Unit gravity vector in device frame (points "down" in world)
-  const gdx = gravX / gLen;
-  const gdy = gravY / gLen;
-  const gdz = gravZ / gLen;
+  // Project onto gravity axis: yaw_rate = ω · ĝ (dot product)
+  // gUnit points along gravity in device frame
+  const rawYawRate = wrx * gUnitX + wry * gUnitY + wrz * gUnitZ;
 
-  // "Up" in device frame = -gravity direction
-  const upx = -gdx, upy = -gdy, upz = -gdz;
+  // Smooth for display
+  yawRate = yawRate * (1 - GYRO_LP) + rawYawRate * GYRO_LP;
 
-  // We need a "North" vector in device frame.
-  // Use compass heading: alpha = angle from North, clockwise
-  // In device frame, when phone is in portrait, +Y points to the top of the phone.
-  // The heading tells us where North is relative to the phone's top.
-  //
-  // However, deriving the full North vector in device frame from alpha alone is tricky
-  // when the phone is tilted. A simpler approach:
-  //
-  // We project device-Y onto the horizontal plane (perpendicular to gravity),
-  // then rotate by the difference between the compass heading and the projection angle.
-  //
-  // Actually, the most robust approach for our use case:
-  // 1. Project motion acceleration onto the horizontal plane (remove gravity component)
-  // 2. Use compass heading to rotate horizontal components to world N/E
-
-  // Project motion accel onto gravity direction (vertical component)
-  const motDotG = motX*gdx + motY*gdy + motZ*gdz;
-  // Vertical acceleration (positive = upward)
-  const accelUp = -motDotG;
-
-  // Horizontal acceleration in device frame (subtract vertical component)
-  const hDevX = motX - motDotG * gdx;
-  const hDevY = motY - motDotG * gdy;
-  const hDevZ = motZ - motDotG * gdz;
-
-  // Now we need to map (hDevX, hDevY, hDevZ) to world (East, North).
-  // We need two horizontal basis vectors in device frame.
-  //
-  // Basis 1: "device forward projected onto horizontal" 
-  //   Device +Y axis = (0, 1, 0) in device frame
-  //   Project onto horizontal: remove gravity component
-  const fwDotG = gdy; // dot((0,1,0), gravity_unit)
-  let fwX = 0 - fwDotG * gdx;
-  let fwY = 1 - fwDotG * gdy;
-  let fwZ = 0 - fwDotG * gdz;
-  let fwLen = Math.sqrt(fwX*fwX + fwY*fwY + fwZ*fwZ);
-  if (fwLen < 0.01) {
-    // Phone is face-up or face-down, use device X instead
-    const rxDotG = gdx;
-    fwX = 1 - rxDotG * gdx;
-    fwY = 0 - rxDotG * gdy;
-    fwZ = 0 - rxDotG * gdz;
-    fwLen = Math.sqrt(fwX*fwX + fwY*fwY + fwZ*fwZ);
+  // Integrate
+  if (lastMotionTime !== null) {
+    const dt = (now - lastMotionTime) / 1000;
+    if (dt > 0 && dt < 0.5) {
+      yawAngle += rawYawRate * dt;
+    }
   }
-  if (fwLen > 0.001) { fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen; }
+  lastMotionTime = now;
 
-  // Basis 2: cross product of up × forward = "right" in horizontal plane
-  let rtX = upy*fwZ - upz*fwY;
-  let rtY = upz*fwX - upx*fwZ;
-  let rtZ = upx*fwY - upy*fwX;
-  const rtLen = Math.sqrt(rtX*rtX + rtY*rtY + rtZ*rtZ);
-  if (rtLen > 0.001) { rtX /= rtLen; rtY /= rtLen; rtZ /= rtLen; }
+  // Update UI
+  const displayDeg = ((yawAngle % 360) + 360) % 360;
+  document.getElementById('yawAngle').textContent = displayDeg.toFixed(1) + '°';
+  document.getElementById('yawRate').textContent = yawRate.toFixed(1) + ' °/s';
 
-  // Project horizontal accel onto these basis vectors
-  // "forward" component (along device top direction projected to horizontal)
-  const accelFwd = hDevX*fwX + hDevY*fwY + hDevZ*fwZ;
-  // "right" component
-  const accelRt = hDevX*rtX + hDevY*rtY + hDevZ*rtZ;
-
-  // Now rotate from device-relative (forward/right) to world (North/East) using compass
-  // oriAlpha: 0=North, 90=East, measured clockwise from North to device top
-  // "forward" direction in world = heading direction
-  const hdg = oriAlpha * Math.PI / 180;
-  const cosH = Math.cos(hdg), sinH = Math.sin(hdg);
-
-  // World North and East components
-  // Device forward -> world: North = cos(heading), East = sin(heading)
-  // Device right -> world: North = -sin(heading)... wait, let's be careful
-  // If heading=0 (device points North): forward=North, right=East ✓
-  // If heading=90 (device points East): forward=East, right=South ✓
-  const accelNorth = accelFwd * cosH - accelRt * sinH;
-  const accelEast  = accelFwd * sinH + accelRt * cosH;
-
-  // Debug
-  document.getElementById('dbWorld').textContent = `N:${accelNorth.toFixed(2)} E:${accelEast.toFixed(2)} U:${accelUp.toFixed(2)}`;
-
-  if (MODE === 'step') {
-    processStep(motX, motY, motZ, accelUp, dt, now);
-  } else {
-    processRaw(accelNorth, accelEast, accelUp, dt, now);
-  }
-
-  const elapsed = (now - startTime) / 1000;
-  updateInfo(elapsed);
-  if (now - lastDrawTime > 50) { lastDrawTime = now; drawMap(); }
-}
-
-// ============ STEP MODE ============
-function processStep(motX, motY, motZ, accelUp, dt, now) {
-  const mag = Math.sqrt(motX*motX + motY*motY + motZ*motZ);
-
-  if (mag > prevAccelMag) {
-    accelRising = true;
-  } else if (accelRising && prevAccelMag > STEP_THRESHOLD && (now - lastStepTime) > STEP_COOLDOWN) {
-    accelRising = false;
-    lastStepTime = now;
-    stepCount++;
-
-    const hdg = oriAlpha * Math.PI / 180;
-    // X = East, Y = North
-    posX += STEP_LENGTH * Math.sin(hdg);
-    posY += STEP_LENGTH * Math.cos(hdg);
-    totalDistance += STEP_LENGTH;
-
-    const elapsed = (now - startTime) / 1000;
-    path.push({ x: posX, y: posY, z: posZ, t: elapsed });
-  } else if (mag < prevAccelMag) {
-    accelRising = false;
-  }
-  prevAccelMag = mag;
-
-  // Vertical tracking
-  const fUp = Math.abs(accelUp) < 0.2 ? 0 : accelUp;
-  velZ = velZ * 0.95 + fUp * dt;
-  posZ += velZ * dt;
-
-  document.getElementById('heading').textContent = oriAlpha.toFixed(0);
-}
-
-// ============ RAW MODE ============
-function processRaw(aN, aE, aUp, dt, now) {
-  // Noise gate
-  const fN = Math.abs(aN) < RAW_NOISE_GATE ? 0 : aN;
-  const fE = Math.abs(aE) < RAW_NOISE_GATE ? 0 : aE;
-  const fU = Math.abs(aUp) < RAW_NOISE_GATE ? 0 : aUp;
-
-  // Zero-velocity update
-  if (fN===0 && fE===0 && fU===0) {
-    rawZuptCount++;
-    if (rawZuptCount >= RAW_ZUPT_SAMPLES) { velX*=0.4; velY*=0.4; velZ*=0.4; }
-  } else { rawZuptCount = 0; }
-
-  // Integrate: vel in world frame (X=East, Y=North, Z=Up)
-  velX = velX * RAW_VEL_DECAY + fE * dt;  // East
-  velY = velY * RAW_VEL_DECAY + fN * dt;  // North
-  velZ = velZ * RAW_VEL_DECAY + fU * dt;  // Up
-
-  const dxdt = velX * dt, dydt = velY * dt;
-  posX += dxdt; posY += dydt; posZ += velZ * dt;
-  totalDistance += Math.sqrt(dxdt*dxdt + dydt*dydt);
-
-  const elapsed = (now - startTime) / 1000;
-  path.push({ x: posX, y: posY, z: posZ, t: elapsed });
-
-  document.getElementById('heading').textContent = oriAlpha.toFixed(0);
+  updatePano(displayDeg);
+  updateCompass(displayDeg);
 }
 
 // ============ CALIBRATION ============
 function startCalibration() {
   calibrating = true;
   calStartTime = performance.now();
-  calSamples = [];
+  calAccelSamples = [];
   document.getElementById('calOverlay').classList.remove('hidden');
   document.getElementById('calFill').style.width = '0%';
 }
@@ -484,178 +470,94 @@ function finishCalibration() {
   calibrating = false;
   document.getElementById('calOverlay').classList.add('hidden');
 
-  // Use final gravity estimate (already converged via low-pass filter during calibration)
-  // No extra work needed — gravity vector is continuously updated
-
-  recording = true;
-  lastTimestamp = null;
-  startTime = performance.now();
-  document.getElementById('startBtn').disabled = true;
-  document.getElementById('stopBtn').disabled = false;
-  document.getElementById('status').textContent = '🔴 正在记录... 拿着手机走动吧！';
-}
-
-// ============ UI ============
-function updateInfo(elapsed) {
-  document.getElementById('stepCount').textContent = stepCount;
-  document.getElementById('totalDist').textContent = totalDistance.toFixed(2);
-  document.getElementById('totalTime').textContent = elapsed.toFixed(1);
-  document.getElementById('dispX').textContent = posX.toFixed(2);
-  document.getElementById('dispY').textContent = posY.toFixed(2);
-  document.getElementById('dispZ').textContent = posZ.toFixed(2);
-  const speed = MODE==='step'
-    ? (stepCount>1 && elapsed>0 ? totalDistance/elapsed : 0)
-    : Math.sqrt(velX**2 + velY**2);
-  document.getElementById('curSpeed').textContent = speed.toFixed(2);
-}
-
-// ============ MAP ============
-function drawMap() {
-  const w = canvas.width / dpr, h = canvas.height / dpr;
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.strokeStyle='#1a1a35'; ctx.lineWidth=0.5;
-  for(let x=0;x<w;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
-  for(let y=0;y<h;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
-
-  if (path.length < 2) {
-    ctx.fillStyle='#51cf66'; ctx.beginPath(); ctx.arc(w/2,h/2,6,0,Math.PI*2); ctx.fill();
-    if (permissionGranted) {
-      const hdg = oriAlpha * Math.PI / 180;
-      ctx.strokeStyle='rgba(126,184,255,0.4)'; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.moveTo(w/2,h/2);
-      ctx.lineTo(w/2+Math.sin(hdg)*40, h/2-Math.cos(hdg)*40); ctx.stroke();
-    }
-    if (!recording && !path.length) {
-      ctx.fillStyle='#555'; ctx.font='13px -apple-system,sans-serif'; ctx.textAlign='center';
-      ctx.fillText('轨迹将在此处显示',w/2,h/2+30);
-    }
+  if (calAccelSamples.length < CAL_MIN_SAMPLES) {
+    document.getElementById('status').textContent = '❌ Not enough samples. Try again.';
     return;
   }
 
-  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-  for(const p of path){if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;}
-  const rX=Math.max(maxX-minX,2), rY=Math.max(maxY-minY,2);
-  const pad=0.3;
-  const pMinX=minX-rX*pad,pMaxX=maxX+rX*pad,pMinY=minY-rY*pad,pMaxY=maxY+rY*pad;
-  const pRX=pMaxX-pMinX,pRY=pMaxY-pMinY;
-  const scale=Math.min(w/pRX,h/pRY);
-  const offX=(w-pRX*scale)/2, offY=(h-pRY*scale)/2;
+  // Average accelerationIncludingGravity during calibration = gravity vector
+  let sx = 0, sy = 0, sz = 0;
+  for (const s of calAccelSamples) { sx += s.x; sy += s.y; sz += s.z; }
+  const n = calAccelSamples.length;
+  const avgX = sx / n, avgY = sy / n, avgZ = sz / n;
 
-  function toS(px,py){return{sx:offX+(px-pMinX)*scale, sy:offY+(pMaxY-py)*scale};}
-
-  // Scale bar
-  let sbm=1,sbp=sbm*scale;
-  if(sbp<30){sbm=5;sbp=sbm*scale;} if(sbp<30){sbm=10;sbp=sbm*scale;}
-  if(sbp>w*0.4){sbm=0.5;sbp=sbm*scale;} if(sbp>w*0.4){sbm=0.1;sbp=sbm*scale;}
-  ctx.strokeStyle='#444';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(12,h-16);ctx.lineTo(12+sbp,h-16);ctx.stroke();
-  ctx.fillStyle='#666';ctx.font='10px -apple-system,sans-serif';ctx.textAlign='left';
-  ctx.fillText(sbm+' m',12,h-22);
-
-  // Downsample
-  const maxPts=600, step=Math.max(1,Math.floor(path.length/maxPts));
-  const sampled=[];
-  for(let i=0;i<path.length;i+=step)sampled.push(path[i]);
-  if(sampled[sampled.length-1]!==path[path.length-1])sampled.push(path[path.length-1]);
-
-  // Path
-  ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';
-  for(let i=1;i<sampled.length;i++){
-    const ratio=i/(sampled.length-1);
-    const r=Math.round(60+ratio*120),g=Math.round(130+ratio*80),b=Math.min(Math.round(220+ratio*30),255);
-    ctx.strokeStyle=`rgba(${r},${g},${b},${0.5+ratio*0.5})`;
-    const p0=toS(sampled[i-1].x,sampled[i-1].y),p1=toS(sampled[i].x,sampled[i].y);
-    ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+  // Normalize to get gravity unit vector in device frame
+  const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
+  if (mag < 5) {
+    document.getElementById('status').textContent = '❌ Gravity too weak. Were sensors active?';
+    return;
   }
 
-  // Step dots
-  if(MODE==='step'&&path.length<200){
-    ctx.fillStyle='rgba(126,184,255,0.5)';
-    for(const p of path){const sp=toS(p.x,p.y);ctx.beginPath();ctx.arc(sp.sx,sp.sy,3,0,Math.PI*2);ctx.fill();}
-  }
+  gUnitX = avgX / mag;
+  gUnitY = avgY / mag;
+  gUnitZ = avgZ / mag;
 
-  // Start
-  const sp=toS(path[0].x,path[0].y);
-  ctx.fillStyle='#51cf66';ctx.beginPath();ctx.arc(sp.sx,sp.sy,8,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('S',sp.sx,sp.sy);
+  // Also seed the continuous gravity filter
+  gravX = avgX; gravY = avgY; gravZ = avgZ;
 
-  // End
-  const last=path[path.length-1], ep=toS(last.x,last.y);
-  ctx.fillStyle='#ff6b6b';ctx.beginPath();ctx.arc(ep.sx,ep.sy,8,0,Math.PI*2);ctx.fill();
+  // Reset yaw
+  yawAngle = 0;
+  yawRate = 0;
+  lastMotionTime = null;
 
-  // Heading arrow
-  const hdg=oriAlpha*Math.PI/180;
-  ctx.strokeStyle='rgba(255,107,107,0.8)';ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.moveTo(ep.sx,ep.sy);
-  ctx.lineTo(ep.sx+Math.sin(hdg)*18,ep.sy-Math.cos(hdg)*18);ctx.stroke();
-
-  // North
-  ctx.fillStyle='#555';ctx.font='11px -apple-system,sans-serif';ctx.textAlign='right';
-  ctx.fillText('↑ N',w-10,18);
-
-  // Return line
-  const dist=Math.sqrt((last.x-path[0].x)**2+(last.y-path[0].y)**2);
-  if(dist>0.2){
-    ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(sp.sx,sp.sy);ctx.lineTo(ep.sx,ep.sy);ctx.stroke();
-    ctx.setLineDash([]);
-    const mx=(sp.sx+ep.sx)/2,my=(sp.sy+ep.sy)/2;
-    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px -apple-system,sans-serif';ctx.textAlign='center';
-    ctx.fillText(dist.toFixed(1)+'m',mx,my-6);
-  }
+  calibrated = true;
+  document.getElementById('resetBtn').style.display = '';
+  document.getElementById('status').textContent =
+    `✅ Calibrated! Gravity vector: (${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)}). Rotate your phone!`;
 }
 
-// ============ CONTROLS ============
+function recalibrate() {
+  calibrated = false;
+  yawAngle = 0;
+  yawRate = 0;
+  lastMotionTime = null;
+  document.getElementById('yawAngle').textContent = '0.0°';
+  document.getElementById('yawRate').textContent = '0.0 °/s';
+  updatePano(0);
+  updateCompass(0);
+  startCalibration();
+}
+
+// ============ PERMISSION ============
 function requestPermission() {
-  if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
-    Promise.all([DeviceMotionEvent.requestPermission(),DeviceOrientationEvent.requestPermission()])
-    .then(([ms,os])=>{
-      if(ms==='granted'&&os==='granted')onPermGranted();
-      else document.getElementById('status').textContent='❌ 权限被拒绝';
-    }).catch(err=>{document.getElementById('status').textContent='❌ '+err.message;});
-  } else { onPermGranted(); }
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission()
+      .then(state => {
+        if (state === 'granted') onPermGranted();
+        else document.getElementById('status').textContent = '❌ Permission denied';
+      })
+      .catch(err => {
+        document.getElementById('status').textContent = '❌ ' + err.message;
+      });
+  } else {
+    onPermGranted();
+  }
 }
 
 function onPermGranted() {
-  permissionGranted=true;
-  window.addEventListener('deviceorientation',handleOrientation,true);
-  window.addEventListener('devicemotion',handleMotion,true);
-  document.getElementById('permBtn').disabled=true;
-  document.getElementById('permBtn').textContent='✅ 已授权';
-  document.getElementById('startBtn').disabled=false;
-  document.getElementById('status').textContent='传感器就绪。点击「开始」后请静置手机 2 秒校准。';
+  permissionGranted = true;
+  window.addEventListener('devicemotion', handleMotion, true);
+  document.getElementById('permBtn').disabled = true;
+  document.getElementById('permBtn').textContent = '✅ Granted';
+
+  // Build UI
+  buildPanoStrip();
+  buildCompass();
+  updatePano(0);
+
+  // Start calibration immediately
+  startCalibration();
 }
 
-function startRecording(){if(!permissionGranted)return; startCalibration();}
-
-function stopRecording() {
-  recording=false;
-  document.getElementById('startBtn').disabled=false;
-  document.getElementById('stopBtn').disabled=true;
-  drawMap();
-  const elapsed=path.length>0?path[path.length-1].t:0;
-  const info=MODE==='step'?`共 ${stepCount} 步，${totalDistance.toFixed(2)} 米`:`共 ${path.length} 点，${totalDistance.toFixed(2)} 米`;
-  document.getElementById('status').textContent=`✅ 完成！${info}，${elapsed.toFixed(1)} 秒`;
-}
-
-function resetAll() {
-  recording=false;calibrating=false;lastTimestamp=null;
-  posX=0;posY=0;posZ=0;velX=0;velY=0;velZ=0;
-  path=[];totalDistance=0;stepCount=0;rawZuptCount=0;
-  prevAccelMag=0;accelRising=false;lastStepTime=0;
-  document.getElementById('calOverlay').classList.add('hidden');
-  document.getElementById('startBtn').disabled=!permissionGranted;
-  document.getElementById('stopBtn').disabled=true;
-  ['totalDist','dispX','dispY','dispZ','curSpeed'].forEach(id=>document.getElementById(id).textContent='0.00');
-  document.getElementById('totalTime').textContent='0.0';
-  document.getElementById('stepCount').textContent='0';
-  document.getElementById('status').textContent=permissionGranted?'已重置':'请先授权传感器';
-  drawMap();
-}
-
-resizeCanvas();
+// ============ INIT ============
+window.addEventListener('load', () => {
+  buildPanoStrip();
+  buildCompass();
+});
+window.addEventListener('resize', () => {
+  buildPanoStrip();
+  updatePano(((yawAngle % 360) + 360) % 360);
+});
 </script>
 </body>
 </html>
