@@ -3,317 +3,434 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Sensor Diagnostic</title>
+<title>Yaw Angle Chart</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #0a0a1a; color: #e0e0e0;
     min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-    padding: 12px; overflow-x: hidden;
+    padding: 16px; overflow-x: hidden;
   }
-  h1 { font-size: 1.2rem; margin-bottom: 4px; color: #7eb8ff; }
-  .sub { font-size: 0.7rem; color: #666; margin-bottom: 12px; text-align: center; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; color: #7eb8ff; text-align: center; }
+  .subtitle { font-size: 0.72rem; color: #666; margin-bottom: 14px; text-align: center; }
+
+  .controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center; }
   .btn {
-    border: none; padding: 14px 36px; border-radius: 12px; font-size: 1rem;
-    font-weight: 600; cursor: pointer; color: white; margin-bottom: 14px;
-    background: linear-gradient(135deg, #4a90d9, #357abd);
+    border: none; padding: 12px 24px; border-radius: 12px; font-size: 0.95rem;
+    font-weight: 600; cursor: pointer; color: white; transition: transform 0.15s, opacity 0.2s;
   }
-  .btn:disabled { opacity: 0.4; }
+  .btn:active { transform: scale(0.96); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-perm { background: linear-gradient(135deg, #4a90d9, #357abd); }
+  .btn-reset { background: linear-gradient(135deg, #868e96, #495057); }
 
-  .section {
-    width: 100%; max-width: 460px; background: #12122a; border-radius: 12px;
-    padding: 12px; border: 1px solid #1e1e40; margin-bottom: 10px;
+  .chart-container {
+    width: 100%; max-width: 460px; height: 300px;
+    background: #0d0d24; border-radius: 16px; border: 1px solid #1e1e40;
+    position: relative; overflow: hidden; margin-bottom: 14px;
   }
-  .section-title {
-    font-size: 0.68rem; color: #7eb8ff; text-transform: uppercase;
-    margin-bottom: 8px; letter-spacing: 0.8px;
-  }
+  canvas { width: 100%; height: 100%; display: block; }
 
-  .chart-row {
-    display: flex; align-items: center; margin-bottom: 6px; gap: 8px;
+  .info-row {
+    width: 100%; max-width: 460px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;
   }
-  .chart-row:last-child { margin-bottom: 0; }
-  .chart-label {
-    font-size: 0.75rem; font-weight: 700; min-width: 42px; text-align: right;
-    font-variant-numeric: tabular-nums;
+  .info-card {
+    background: #12122a; border-radius: 10px; padding: 12px;
+    border: 1px solid #1e1e40; text-align: center;
   }
-  .chart-canvas-wrap {
-    flex: 1; height: 50px; background: #0a0a1a; border-radius: 6px;
-    overflow: hidden; position: relative;
-  }
-  .chart-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
-  .chart-val {
-    font-size: 0.72rem; font-weight: 600; min-width: 58px; text-align: right;
-    font-variant-numeric: tabular-nums; color: #aaa;
-  }
+  .info-label { font-size: 0.63rem; color: #8888aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .info-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #7eb8ff; }
+  .info-value.sm { font-size: 0.95rem; color: #999; }
 
-  .hint {
-    font-size: 0.68rem; color: #555; margin-top: 6px; line-height: 1.4;
-    border-top: 1px solid #1e1e40; padding-top: 6px;
-  }
+  #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 460px; line-height: 1.4; }
 
-  #status { font-size: 0.75rem; color: #888; margin-top: 6px; text-align: center; }
+  .cal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.92); display: flex; flex-direction: column;
+    justify-content: center; align-items: center; z-index: 100; padding: 30px;
+  }
+  .cal-overlay.hidden { display: none; }
+  .cal-icon { font-size: 3rem; margin-bottom: 16px; }
+  .cal-title { color: #fcc419; font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
+  .cal-desc { color: #888; font-size: 0.9rem; text-align: center; line-height: 1.5; margin-bottom: 20px; max-width: 300px; }
+  .cal-bar { width: 200px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+  .cal-fill { height: 100%; background: #fcc419; border-radius: 4px; transition: width 0.1s; width: 0%; }
+  .cal-status { color: #aaa; font-size: 0.8rem; }
 </style>
 </head>
 <body>
 
-<h1>🔬 Sensor Diagnostic</h1>
-<div class="sub">ECG-style live charts for all sensor axes</div>
+<h1>🧭 Yaw Angle Chart</h1>
+<div class="subtitle">Rotation around gravity axis · ECG-style scrolling</div>
 
-<button class="btn" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
+<div class="controls">
+  <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
+  <button class="btn btn-reset" id="resetBtn" onclick="recalibrate()" style="display:none;">↻ Recalibrate</button>
+</div>
 
-<div id="sections"></div>
+<div class="chart-container">
+  <canvas id="chart"></canvas>
+</div>
 
-<div id="status">Tap button to start</div>
+<div class="info-row">
+  <div class="info-card">
+    <div class="info-label">Current Angle</div>
+    <div class="info-value" id="curAngle">0.0°</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Yaw Rate</div>
+    <div class="info-value sm" id="curRate">0.0 °/s</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">|g| Check</div>
+    <div class="info-value sm" id="gCheck">--</div>
+  </div>
+</div>
+
+<div id="status">Tap "Grant Sensors" to begin</div>
+
+<div class="cal-overlay hidden" id="calOverlay">
+  <div class="cal-icon">📐</div>
+  <div class="cal-title">Calibrating Gravity Vector</div>
+  <div class="cal-desc">Hold your phone still in any position for 3 seconds. It does NOT need to be level.</div>
+  <div class="cal-bar"><div class="cal-fill" id="calFill"></div></div>
+  <div class="cal-status" id="calStatus">Collecting samples...</div>
+</div>
 
 <script>
 // ============ CONFIG ============
-const HISTORY = 150;       // number of samples to show
-const SAMPLE_MS = 50;      // sample every 50ms = 20fps
-const COLORS = {
-  red:   '#ff6b6b',
-  green: '#51cf66',
-  blue:  '#7eb8ff',
-};
+const CAL_DURATION = 3000;
+const CAL_MIN_SAMPLES = 50;
+const SAMPLE_INTERVAL = 100;
+const CHART_SECONDS = 15;
+const Y_RANGE_MIN = 10;
+const GRAV_LP = 0.97;
 
-// ============ CHART DEFINITIONS ============
-const groups = [
-  {
-    title: 'accelerationIncludingGravity (m/s²)',
-    id: 'ag',
-    axes: [
-      { key: 'ag_x', label: 'x', color: COLORS.red },
-      { key: 'ag_y', label: 'y', color: COLORS.green },
-      { key: 'ag_z', label: 'z', color: COLORS.blue },
-    ],
-    yRange: 15,
-    hint: '📱 Flat face-up → which axis ≈ 9.8?   Spin on table → should stay steady',
-  },
-  {
-    title: 'acceleration (no gravity) (m/s²)',
-    id: 'a',
-    axes: [
-      { key: 'a_x', label: 'x', color: COLORS.red },
-      { key: 'a_y', label: 'y', color: COLORS.green },
-      { key: 'a_z', label: 'z', color: COLORS.blue },
-    ],
-    yRange: 5,
-    hint: '📱 Should be ~0 when still. Spikes when you move.',
-  },
-  {
-    title: 'rotationRate (°/s)',
-    id: 'rr',
-    axes: [
-      { key: 'rr_a', label: 'alpha', color: COLORS.red },
-      { key: 'rr_b', label: 'beta', color: COLORS.green },
-      { key: 'rr_g', label: 'gamma', color: COLORS.blue },
-    ],
-    yRange: 100,
-    hint: '📱 Flat + spin on table → which spikes?   Flat + tilt fwd/back → which spikes?',
-  },
-  {
-    title: 'DeviceOrientation (°)',
-    id: 'ori',
-    axes: [
-      { key: 'ori_a', label: 'alpha', color: COLORS.red },
-      { key: 'ori_b', label: 'beta', color: COLORS.green },
-      { key: 'ori_g', label: 'gamma', color: COLORS.blue },
-    ],
-    yRange: 180,
-    hint: '📱 alpha: compass heading   beta: front/back tilt   gamma: left/right tilt',
-  },
-];
+// ============ AXIS MAPPING (from user testing on iOS) ============
+// rotationRate:
+//   .alpha = rotation around device X axis (short edge, "pitch")
+//   .beta  = rotation around device Y axis (long edge, "roll")
+//   .gamma = rotation around device Z axis (through screen, "yaw on table")
+//
+// accelerationIncludingGravity when flat face-up:
+//   z ≈ +9.8
+//
+// So angular velocity vector ω in device frame:
+//   ω = (rr.alpha, rr.beta, rr.gamma) for (X, Y, Z)
+//
+// Gravity unit vector when flat: ĝ ≈ (0, 0, +1)
+//
+// Yaw rate = ω · ĝ = rr.gamma when flat ✓
+// Tilting up (short edge) → rr.alpha changes, ĝ·(1,0,0)=0 → no yaw ✓
 
 // ============ STATE ============
-const latest = {};   // key → current value
-const buffers = {};  // key → circular array of values
-const canvases = {}; // key → { canvas, ctx }
+let permissionGranted = false;
+let calibrated = false;
+let calibrating = false;
+
+let calStartTime = 0;
+let calAccelSamples = [];
+
+// Gravity unit vector in device frame
+let gUnitX = 0, gUnitY = 0, gUnitZ = 1;
+
+// Continuous gravity LP
+let gravX = 0, gravY = 0, gravZ = 9.8;
+let gravInited = false;
+
+// Yaw
+let yawAngle = 0;
+let yawRate = 0;
+let lastMotionTime = null;
+
+// Chart data
+let data = [];
+let chartStartTime = 0;
+let sampleTimer = null;
+
+// Canvas
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
 
-// Init buffers
-for (const g of groups) {
-  for (const ax of g.axes) {
-    latest[ax.key] = 0;
-    buffers[ax.key] = new Array(HISTORY).fill(0);
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawChart();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ============ SENSOR ============
+function handleMotion(e) {
+  const now = performance.now();
+
+  const agx = e.accelerationIncludingGravity?.x || 0;
+  const agy = e.accelerationIncludingGravity?.y || 0;
+  const agz = e.accelerationIncludingGravity?.z || 0;
+
+  if (!gravInited) {
+    gravX = agx; gravY = agy; gravZ = agz; gravInited = true;
+  } else {
+    gravX = GRAV_LP * gravX + (1 - GRAV_LP) * agx;
+    gravY = GRAV_LP * gravY + (1 - GRAV_LP) * agy;
+    gravZ = GRAV_LP * gravZ + (1 - GRAV_LP) * agz;
   }
+
+  const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
+  document.getElementById('gCheck').textContent = gMag.toFixed(2);
+
+  // Calibration
+  if (calibrating) {
+    calAccelSamples.push({ x: agx, y: agy, z: agz });
+    const progress = Math.min((now - calStartTime) / CAL_DURATION * 100, 100);
+    document.getElementById('calFill').style.width = progress + '%';
+    document.getElementById('calStatus').textContent = `Collecting... ${calAccelSamples.length} samples`;
+    if (now - calStartTime >= CAL_DURATION) finishCalibration();
+    return;
+  }
+
+  if (!calibrated) return;
+
+  const rr = e.rotationRate;
+  if (!rr) return;
+
+  // ω in device frame using CORRECT mapping:
+  //   ω_x = rr.alpha  (around device X = short edge)
+  //   ω_y = rr.beta   (around device Y = long edge)
+  //   ω_z = rr.gamma  (around device Z = through screen)
+  const wx = rr.alpha || 0;
+  const wy = rr.beta  || 0;
+  const wz = rr.gamma || 0;
+
+  // Project onto gravity axis: yaw_rate = ω · ĝ
+  const rawYawRate = wx * gUnitX + wy * gUnitY + wz * gUnitZ;
+
+  yawRate = yawRate * 0.7 + rawYawRate * 0.3;
+
+  if (lastMotionTime !== null) {
+    const dt = (now - lastMotionTime) / 1000;
+    if (dt > 0 && dt < 0.5) {
+      yawAngle += rawYawRate * dt;
+    }
+  }
+  lastMotionTime = now;
+
+  document.getElementById('curAngle').textContent = yawAngle.toFixed(1) + '°';
+  document.getElementById('curRate').textContent = yawRate.toFixed(1) + ' °/s';
 }
 
-// ============ BUILD DOM ============
-function buildUI() {
-  const container = document.getElementById('sections');
-  container.innerHTML = '';
-
-  for (const g of groups) {
-    const sec = document.createElement('div');
-    sec.className = 'section';
-
-    let html = `<div class="section-title">${g.title}</div>`;
-
-    for (const ax of g.axes) {
-      html += `
-        <div class="chart-row">
-          <div class="chart-label" style="color:${ax.color}">${ax.label}</div>
-          <div class="chart-canvas-wrap"><canvas id="cv_${ax.key}"></canvas></div>
-          <div class="chart-val" id="val_${ax.key}">0.00</div>
-        </div>`;
-    }
-
-    html += `<div class="hint">${g.hint}</div>`;
-    sec.innerHTML = html;
-    container.appendChild(sec);
-  }
-
-  // Setup canvases
-  for (const g of groups) {
-    for (const ax of g.axes) {
-      const cv = document.getElementById('cv_' + ax.key);
-      const rect = cv.parentElement.getBoundingClientRect();
-      cv.width = rect.width * dpr;
-      cv.height = rect.height * dpr;
-      const c = cv.getContext('2d');
-      c.setTransform(dpr, 0, 0, dpr, 0, 0);
-      canvases[ax.key] = { canvas: cv, ctx: c, w: rect.width, h: rect.height };
-    }
-  }
+// ============ CHART ============
+function startSampling() {
+  chartStartTime = performance.now();
+  data = [];
+  sampleTimer = setInterval(() => {
+    const t = (performance.now() - chartStartTime) / 1000;
+    data.push({ t, angle: yawAngle });
+    const maxSamples = Math.ceil(CHART_SECONDS / (SAMPLE_INTERVAL / 1000)) + 20;
+    if (data.length > maxSamples) data.shift();
+    drawChart();
+  }, SAMPLE_INTERVAL);
 }
 
-// ============ DRAWING ============
-function drawChart(key, color, yRange) {
-  const { ctx, w, h } = canvases[key];
-  const buf = buffers[key];
+function stopSampling() {
+  if (sampleTimer) { clearInterval(sampleTimer); sampleTimer = null; }
+}
+
+function drawChart() {
+  const w = canvas.width / dpr, h = canvas.height / dpr;
+  const pad = { top: 20, right: 16, bottom: 32, left: 50 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
 
   ctx.clearRect(0, 0, w, h);
 
+  let maxAbs = 45;
+  for (const d of data) { const a = Math.abs(d.angle); if (a > maxAbs) maxAbs = a; }
+  const yRange = Math.max(Y_RANGE_MIN, Math.ceil(maxAbs / 10) * 10 + 5);
+
+  const now = data.length > 0 ? data[data.length - 1].t : 0;
+  const tMin = now - CHART_SECONDS, tMax = now;
+
+  function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
+  function yPos(a) { return pad.top + ch / 2 - (a / yRange) * (ch / 2); }
+
+  // Background
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+  grad.addColorStop(0, 'rgba(255,107,107,0.03)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(81,207,102,0.03)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(pad.left, pad.top, cw, ch);
+
+  // H grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+  const yStep = yRange <= 30 ? 10 : yRange <= 90 ? 15 : yRange <= 180 ? 30 : 45;
+  for (let a = -yRange; a <= yRange; a += yStep) {
+    const y = yPos(a); if (y < pad.top || y > pad.top + ch) continue;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+  }
+
   // Zero line
-  const zeroY = h / 2;
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 0.5;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(w, zeroY); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  const zeroY = yPos(0);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cw, zeroY); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Auto-scale: use configured range or expand if data exceeds
-  let maxAbs = yRange;
-  for (const v of buf) { const a = Math.abs(v); if (a > maxAbs) maxAbs = a; }
-  const range = maxAbs * 1.1;
+  // V grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+  const tStep = CHART_SECONDS <= 10 ? 1 : CHART_SECONDS <= 30 ? 2 : 5;
+  const firstT = Math.ceil(tMin / tStep) * tStep;
+  for (let t = firstT; t <= tMax; t += tStep) {
+    const x = xPos(t); if (x < pad.left || x > pad.left + cw) continue;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
+  }
 
-  function yPos(v) { return zeroY - (v / range) * (h / 2 - 4); }
+  // Y labels
+  ctx.fillStyle = '#555'; ctx.font = '10px -apple-system,sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let a = -yRange; a <= yRange; a += yStep) {
+    const y = yPos(a); if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
+    ctx.fillText(a + '°', pad.left - 6, y);
+  }
+
+  // X labels
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let t = firstT; t <= tMax; t += tStep) {
+    const x = xPos(t); if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
+    ctx.fillText(t.toFixed(0) + 's', x, pad.top + ch + 6);
+  }
+
+  // Axis titles
+  ctx.fillStyle = '#444'; ctx.font = '9px -apple-system,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Time', pad.left + cw / 2, h - 4);
+  ctx.save(); ctx.translate(10, pad.top + ch / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Angle (°)', 0, 0); ctx.restore();
+
+  if (data.length < 2) return;
+
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
 
   // Fill
-  ctx.beginPath();
-  const step = w / (HISTORY - 1);
-  ctx.moveTo(0, zeroY);
-  for (let i = 0; i < buf.length; i++) {
-    ctx.lineTo(i * step, yPos(buf[i]));
+  ctx.beginPath(); let started = false;
+  for (const d of data) {
+    if (d.t < tMin) continue;
+    const x = xPos(d.t), y = yPos(d.angle);
+    if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; } else ctx.lineTo(x, y);
   }
-  ctx.lineTo((buf.length - 1) * step, zeroY);
-  ctx.closePath();
-  ctx.fillStyle = color.replace(')', ',0.08)').replace('rgb', 'rgba');
-  ctx.fill();
+  if (started) {
+    ctx.lineTo(xPos(data[data.length - 1].t), zeroY); ctx.closePath();
+    const fg = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+    fg.addColorStop(0, 'rgba(126,184,255,0.15)');
+    fg.addColorStop(0.5, 'rgba(126,184,255,0.02)');
+    fg.addColorStop(1, 'rgba(126,184,255,0.15)');
+    ctx.fillStyle = fg; ctx.fill();
+  }
 
   // Line
-  ctx.beginPath();
-  for (let i = 0; i < buf.length; i++) {
-    const x = i * step, y = yPos(buf[i]);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  ctx.beginPath(); started = false;
+  for (const d of data) {
+    if (d.t < tMin) continue;
+    const x = xPos(d.t), y = yPos(d.angle);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
   }
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
+  ctx.strokeStyle = '#7eb8ff'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
 
-  // Dot at end
-  const lastX = (buf.length - 1) * step;
-  const lastY = yPos(buf[buf.length - 1]);
-  ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(lastX, lastY, 3, 0, Math.PI * 2); ctx.fill();
-
-  // Y range labels
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.font = '8px -apple-system,sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText('+' + range.toFixed(0), 2, 2);
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('-' + range.toFixed(0), 2, h - 2);
-}
-
-function drawAll() {
-  for (const g of groups) {
-    for (const ax of g.axes) {
-      drawChart(ax.key, ax.color, g.yRange);
-    }
+  // Current dot
+  if (data.length > 0) {
+    const last = data[data.length - 1];
+    const lx = xPos(last.t), ly = yPos(last.angle);
+    const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 12);
+    glow.addColorStop(0, 'rgba(126,184,255,0.4)');
+    glow.addColorStop(1, 'rgba(126,184,255,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#7eb8ff'; ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#bbb'; ctx.font = 'bold 11px -apple-system,sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(last.angle.toFixed(1) + '°', lx + 8, ly - 4);
   }
+  ctx.restore();
+
+  ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1;
+  ctx.strokeRect(pad.left, pad.top, cw, ch);
 }
 
-// ============ SAMPLING ============
-let sampleTimer = null;
+// ============ CALIBRATION ============
+function startCalibration() {
+  calibrating = true;
+  calStartTime = performance.now();
+  calAccelSamples = [];
+  document.getElementById('calOverlay').classList.remove('hidden');
+  document.getElementById('calFill').style.width = '0%';
+}
 
-function sample() {
-  for (const g of groups) {
-    for (const ax of g.axes) {
-      buffers[ax.key].push(latest[ax.key]);
-      if (buffers[ax.key].length > HISTORY) buffers[ax.key].shift();
+function finishCalibration() {
+  calibrating = false;
+  document.getElementById('calOverlay').classList.add('hidden');
 
-      const el = document.getElementById('val_' + ax.key);
-      if (el) el.textContent = latest[ax.key].toFixed(2);
-    }
+  if (calAccelSamples.length < CAL_MIN_SAMPLES) {
+    document.getElementById('status').textContent = '❌ Not enough samples. Try again.';
+    return;
   }
-  drawAll();
+
+  let sx = 0, sy = 0, sz = 0;
+  for (const s of calAccelSamples) { sx += s.x; sy += s.y; sz += s.z; }
+  const n = calAccelSamples.length;
+  const avgX = sx / n, avgY = sy / n, avgZ = sz / n;
+  const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
+
+  if (mag < 5) {
+    document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
+    return;
+  }
+
+  gUnitX = avgX / mag;
+  gUnitY = avgY / mag;
+  gUnitZ = avgZ / mag;
+  gravX = avgX; gravY = avgY; gravZ = avgZ;
+
+  yawAngle = 0; yawRate = 0; lastMotionTime = null;
+
+  calibrated = true;
+  document.getElementById('resetBtn').style.display = '';
+  document.getElementById('status').textContent =
+    `✅ Calibrated! ĝ=(${gUnitX.toFixed(2)}, ${gUnitY.toFixed(2)}, ${gUnitZ.toFixed(2)}). Rotate around gravity!`;
+
+  startSampling();
 }
 
-// ============ SENSORS ============
-function handleMotion(e) {
-  const ag = e.accelerationIncludingGravity || {};
-  latest.ag_x = ag.x || 0;
-  latest.ag_y = ag.y || 0;
-  latest.ag_z = ag.z || 0;
-
-  const a = e.acceleration || {};
-  latest.a_x = a.x || 0;
-  latest.a_y = a.y || 0;
-  latest.a_z = a.z || 0;
-
-  const rr = e.rotationRate || {};
-  latest.rr_a = rr.alpha || 0;
-  latest.rr_b = rr.beta || 0;
-  latest.rr_g = rr.gamma || 0;
-}
-
-function handleOrientation(e) {
-  latest.ori_a = e.alpha || 0;
-  latest.ori_b = e.beta || 0;
-  latest.ori_g = e.gamma || 0;
+function recalibrate() {
+  stopSampling(); calibrated = false;
+  yawAngle = 0; yawRate = 0; lastMotionTime = null; data = [];
+  document.getElementById('curAngle').textContent = '0.0°';
+  document.getElementById('curRate').textContent = '0.0 °/s';
+  drawChart(); startCalibration();
 }
 
 // ============ PERMISSION ============
 function requestPermission() {
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    Promise.all([
-      DeviceMotionEvent.requestPermission(),
-      DeviceOrientationEvent.requestPermission()
-    ]).then(([ms, os]) => {
-      if (ms === 'granted' && os === 'granted') startAll();
-      else document.getElementById('status').textContent = '❌ Denied';
-    }).catch(err => { document.getElementById('status').textContent = '❌ ' + err.message; });
-  } else { startAll(); }
+    DeviceMotionEvent.requestPermission()
+      .then(state => {
+        if (state === 'granted') onPermGranted();
+        else document.getElementById('status').textContent = '❌ Permission denied';
+      })
+      .catch(err => { document.getElementById('status').textContent = '❌ ' + err.message; });
+  } else { onPermGranted(); }
 }
 
-function startAll() {
+function onPermGranted() {
+  permissionGranted = true;
   window.addEventListener('devicemotion', handleMotion, true);
-  window.addEventListener('deviceorientation', handleOrientation, true);
   document.getElementById('permBtn').disabled = true;
-  document.getElementById('permBtn').textContent = '✅ Active';
-  document.getElementById('status').textContent = 'Sensors active. Move your phone and observe the charts.';
-
-  buildUI();
-  sampleTimer = setInterval(sample, SAMPLE_MS);
+  document.getElementById('permBtn').textContent = '✅ Granted';
+  startCalibration();
 }
 
-// Resize
-window.addEventListener('resize', () => {
-  if (sampleTimer) buildUI();
-});
+resizeCanvas(); drawChart();
 </script>
 </body>
 </html>
