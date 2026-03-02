@@ -99,9 +99,11 @@
 
 <div class="debug-section">
   <div class="debug-title">Debug</div>
-  <div class="debug-row"><span>Gravity unit (device)</span><span class="debug-val" id="dbGunit">--</span></div>
-  <div class="debug-row"><span>RotationRate (x,y,z)</span><span class="debug-val" id="dbGyro">--</span></div>
-  <div class="debug-row"><span>Projected yaw rate</span><span class="debug-val" id="dbProj">--</span></div>
+  <div class="debug-row"><span>accelIncGravity (raw)</span><span class="debug-val" id="dbAccel">--</span></div>
+  <div class="debug-row"><span>Gravity unit ĝ</span><span class="debug-val" id="dbGunit">--</span></div>
+  <div class="debug-row"><span>rotationRate α,β,γ</span><span class="debug-val" id="dbGyro">--</span></div>
+  <div class="debug-row"><span>ω vector (x,y,z)</span><span class="debug-val" id="dbOmega">--</span></div>
+  <div class="debug-row"><span>ω · ĝ (projected)</span><span class="debug-val" id="dbProj">--</span></div>
 </div>
 
 <div id="status">Tap "Grant Sensors" to begin</div>
@@ -132,10 +134,10 @@ let calStartTime = 0;
 let calAccelSamples = [];
 
 // Gravity unit vector in device frame
-let gUnitX = 0, gUnitY = 0, gUnitZ = -1;
+let gUnitX = 0, gUnitY = 0, gUnitZ = 1;
 
 // Continuous gravity LP
-let gravX = 0, gravY = 0, gravZ = -9.8;
+let gravX = 0, gravY = 0, gravZ = 9.8;
 let gravInited = false;
 
 // Yaw
@@ -166,7 +168,6 @@ window.addEventListener('resize', resizeCanvas);
 function handleMotion(e) {
   const now = performance.now();
 
-  // Update gravity estimate
   const agx = e.accelerationIncludingGravity?.x || 0;
   const agy = e.accelerationIncludingGravity?.y || 0;
   const agz = e.accelerationIncludingGravity?.z || 0;
@@ -181,6 +182,7 @@ function handleMotion(e) {
 
   const gMag = Math.sqrt(gravX*gravX + gravY*gravY + gravZ*gravZ);
   document.getElementById('gCheck').textContent = gMag.toFixed(2);
+  document.getElementById('dbAccel').textContent = `${agx.toFixed(2)}, ${agy.toFixed(2)}, ${agz.toFixed(2)}`;
 
   // Calibration
   if (calibrating) {
@@ -194,40 +196,51 @@ function handleMotion(e) {
 
   if (!calibrated) return;
 
-  // ====== KEY: rotationRate axis definition ======
-  // The Web DeviceMotion API defines rotationRate as:
-  //   .alpha = rotation around device Z axis (perpendicular to screen)  °/s
-  //   .beta  = rotation around device X axis (horizontal, left-right)   °/s
-  //   .gamma = rotation around device Y axis (vertical, top-bottom)     °/s
-  //
-  // So the angular velocity vector in device frame is:
-  //   ω = (beta, gamma, alpha) = (ωx, ωy, ωz)
-  //
-  // To get rotation around gravity axis:
-  //   yaw_rate = ω · ĝ = ωx*ĝx + ωy*ĝy + ωz*ĝz
-
   const rr = e.rotationRate;
   if (!rr) return;
 
-  // Angular velocity in device frame (°/s)
-  const wx = rr.beta  || 0;  // around device X
-  const wy = rr.gamma || 0;  // around device Y
-  const wz = rr.alpha || 0;  // around device Z
+  // ====== rotationRate definition (Web API / iOS): ======
+  // .alpha = rate of rotation around Z axis (through screen), °/s
+  // .beta  = rate of rotation around X axis (left-right edge), °/s
+  // .gamma = rate of rotation around Y axis (top-bottom edge), °/s
+  //
+  // Angular velocity vector ω in device coordinates:
+  //   ω_x = beta   (rotation around X)
+  //   ω_y = gamma  (rotation around Y)
+  //   ω_z = alpha  (rotation around Z)
+  //
+  // accelerationIncludingGravity on iOS when phone flat face-up:
+  //   x ≈ 0, y ≈ 0, z ≈ +9.8
+  // So gravity unit vector ĝ ≈ (0, 0, +1) in device frame
+  //
+  // When you spin the phone on the table (around world gravity = device Z):
+  //   rotationRate.alpha is large → ω_z is large
+  //   ω · ĝ = ω_z * 1 = alpha → correct!
+  //
+  // When you tilt the phone up (around X axis):
+  //   rotationRate.beta is large → ω_x is large
+  //   ω · ĝ = ω_x * 0 = 0 → no yaw → correct!
 
-  // Project onto gravity axis
+  const alpha = rr.alpha || 0;
+  const beta  = rr.beta  || 0;
+  const gamma = rr.gamma || 0;
+
+  // ω in device frame
+  const wx = beta;
+  const wy = gamma;
+  const wz = alpha;
+
+  // Project onto gravity unit vector: yaw_rate = ω · ĝ
   const rawYawRate = wx * gUnitX + wy * gUnitY + wz * gUnitZ;
 
   // Debug
-  document.getElementById('dbGunit').textContent =
-    `(${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)})`;
-  document.getElementById('dbGyro').textContent =
-    `(${wx.toFixed(1)}, ${wy.toFixed(1)}, ${wz.toFixed(1)})`;
+  document.getElementById('dbGunit').textContent = `${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)}`;
+  document.getElementById('dbGyro').textContent = `α:${alpha.toFixed(1)} β:${beta.toFixed(1)} γ:${gamma.toFixed(1)}`;
+  document.getElementById('dbOmega').textContent = `${wx.toFixed(1)}, ${wy.toFixed(1)}, ${wz.toFixed(1)}`;
   document.getElementById('dbProj').textContent = rawYawRate.toFixed(2) + ' °/s';
 
-  // Smooth for display
   yawRate = yawRate * 0.7 + rawYawRate * 0.3;
 
-  // Integrate
   if (lastMotionTime !== null) {
     const dt = (now - lastMotionTime) / 1000;
     if (dt > 0 && dt < 0.5) {
@@ -258,26 +271,22 @@ function stopSampling() {
 }
 
 function drawChart() {
-  const w = canvas.width / dpr;
-  const h = canvas.height / dpr;
+  const w = canvas.width / dpr, h = canvas.height / dpr;
   const pad = { top: 20, right: 16, bottom: 32, left: 50 };
   const cw = w - pad.left - pad.right;
   const ch = h - pad.top - pad.bottom;
 
   ctx.clearRect(0, 0, w, h);
 
-  // Y range auto-scale
   let maxAbs = 45;
   for (const d of data) { const a = Math.abs(d.angle); if (a > maxAbs) maxAbs = a; }
   const yRange = Math.max(Y_RANGE_MIN, Math.ceil(maxAbs / 10) * 10 + 5);
 
-  // Time range
   const now = data.length > 0 ? data[data.length - 1].t : 0;
-  const tMin = now - CHART_SECONDS;
-  const tMax = now;
+  const tMin = now - CHART_SECONDS, tMax = now;
 
   function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
-  function yPos(angle) { return pad.top + ch / 2 - (angle / yRange) * (ch / 2); }
+  function yPos(a) { return pad.top + ch / 2 - (a / yRange) * (ch / 2); }
 
   // Background
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
@@ -291,14 +300,12 @@ function drawChart() {
   ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
   const yStep = yRange <= 30 ? 10 : yRange <= 90 ? 15 : yRange <= 180 ? 30 : 45;
   for (let a = -yRange; a <= yRange; a += yStep) {
-    const y = yPos(a);
-    if (y < pad.top || y > pad.top + ch) continue;
+    const y = yPos(a); if (y < pad.top || y > pad.top + ch) continue;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
   }
 
   // Zero line
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
   const zeroY = yPos(0);
   ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cw, zeroY); ctx.stroke();
   ctx.setLineDash([]);
@@ -308,8 +315,7 @@ function drawChart() {
   const tStep = CHART_SECONDS <= 10 ? 1 : CHART_SECONDS <= 30 ? 2 : 5;
   const firstT = Math.ceil(tMin / tStep) * tStep;
   for (let t = firstT; t <= tMax; t += tStep) {
-    const x = xPos(t);
-    if (x < pad.left || x > pad.left + cw) continue;
+    const x = xPos(t); if (x < pad.left || x > pad.left + cw) continue;
     ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
   }
 
@@ -317,46 +323,36 @@ function drawChart() {
   ctx.fillStyle = '#555'; ctx.font = '10px -apple-system,sans-serif';
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   for (let a = -yRange; a <= yRange; a += yStep) {
-    const y = yPos(a);
-    if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
+    const y = yPos(a); if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
     ctx.fillText(a + '°', pad.left - 6, y);
   }
 
   // X labels
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (let t = firstT; t <= tMax; t += tStep) {
-    const x = xPos(t);
-    if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
+    const x = xPos(t); if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
     ctx.fillText(t.toFixed(0) + 's', x, pad.top + ch + 6);
   }
 
   // Axis titles
   ctx.fillStyle = '#444'; ctx.font = '9px -apple-system,sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Time', pad.left + cw / 2, h - 4);
-  ctx.save();
-  ctx.translate(10, pad.top + ch / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Angle (°)', 0, 0);
-  ctx.restore();
+  ctx.save(); ctx.translate(10, pad.top + ch / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Angle (°)', 0, 0); ctx.restore();
 
   if (data.length < 2) return;
 
-  // Clip
-  ctx.save();
-  ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
 
-  // Fill under curve
-  ctx.beginPath();
-  let started = false;
+  // Fill
+  ctx.beginPath(); let started = false;
   for (const d of data) {
     if (d.t < tMin) continue;
     const x = xPos(d.t), y = yPos(d.angle);
-    if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; }
-    else ctx.lineTo(x, y);
+    if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; } else ctx.lineTo(x, y);
   }
   if (started) {
-    ctx.lineTo(xPos(data[data.length - 1].t), zeroY);
-    ctx.closePath();
+    ctx.lineTo(xPos(data[data.length - 1].t), zeroY); ctx.closePath();
     const fg = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
     fg.addColorStop(0, 'rgba(126,184,255,0.15)');
     fg.addColorStop(0.5, 'rgba(126,184,255,0.02)');
@@ -380,18 +376,14 @@ function drawChart() {
     const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 12);
     glow.addColorStop(0, 'rgba(126,184,255,0.4)');
     glow.addColorStop(1, 'rgba(126,184,255,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#7eb8ff';
-    ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#7eb8ff'; ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#bbb'; ctx.font = 'bold 11px -apple-system,sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(last.angle.toFixed(1) + '°', lx + 8, ly - 4);
   }
-
   ctx.restore();
 
-  // Border
   ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1;
   ctx.strokeRect(pad.left, pad.top, cw, ch);
 }
@@ -425,36 +417,30 @@ function finishCalibration() {
     return;
   }
 
+  // Gravity unit vector: direction that accelerationIncludingGravity points
+  // On iOS flat face-up: (0, 0, +9.8) → ĝ = (0, 0, +1)
+  // On Android flat face-up: (0, 0, +9.8) → ĝ = (0, 0, +1) typically
   gUnitX = avgX / mag;
   gUnitY = avgY / mag;
   gUnitZ = avgZ / mag;
-  gravX = avgX; gravY = avgY; gravZ = avgZ;
 
-  yawAngle = 0;
-  yawRate = 0;
-  lastMotionTime = null;
+  gravX = avgX; gravY = avgY; gravZ = avgZ;
+  yawAngle = 0; yawRate = 0; lastMotionTime = null;
 
   calibrated = true;
   document.getElementById('resetBtn').style.display = '';
-
-  // Tell user what gravity axis looks like
-  // If phone is flat: gUnit ≈ (0, 0, ±1)
-  // If phone is upright: gUnit ≈ (0, ±1, 0)
   document.getElementById('status').textContent =
-    `✅ Calibrated! Rotate phone in the plane perpendicular to gravity.`;
+    `✅ Calibrated! ĝ=(${gUnitX.toFixed(2)}, ${gUnitY.toFixed(2)}, ${gUnitZ.toFixed(2)}). Rotate in the plane ⊥ to gravity!`;
 
   startSampling();
 }
 
 function recalibrate() {
-  stopSampling();
-  calibrated = false;
-  yawAngle = 0; yawRate = 0; lastMotionTime = null;
-  data = [];
+  stopSampling(); calibrated = false;
+  yawAngle = 0; yawRate = 0; lastMotionTime = null; data = [];
   document.getElementById('curAngle').textContent = '0.0°';
   document.getElementById('curRate').textContent = '0.0 °/s';
-  drawChart();
-  startCalibration();
+  drawChart(); startCalibration();
 }
 
 // ============ PERMISSION ============
@@ -477,8 +463,7 @@ function onPermGranted() {
   startCalibration();
 }
 
-resizeCanvas();
-drawChart();
+resizeCanvas(); drawChart();
 </script>
 </body>
 </html>
