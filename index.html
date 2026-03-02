@@ -44,6 +44,14 @@
   .info-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #7eb8ff; }
   .info-value.sm { font-size: 0.95rem; color: #999; }
 
+  .debug-section {
+    width: 100%; max-width: 460px; background: #12122a; border-radius: 10px;
+    padding: 10px 14px; border: 1px solid #1e1e40; margin-bottom: 12px;
+  }
+  .debug-title { font-size: 0.63rem; color: #555; text-transform: uppercase; margin-bottom: 6px; }
+  .debug-row { display: flex; justify-content: space-between; font-size: 0.73rem; color: #666; margin-bottom: 2px; }
+  .debug-val { font-variant-numeric: tabular-nums; color: #888; }
+
   #status { font-size: 0.78rem; color: #888; text-align: center; margin-top: 4px; max-width: 460px; line-height: 1.4; }
 
   .cal-overlay {
@@ -63,7 +71,7 @@
 <body>
 
 <h1>🧭 Yaw Angle Chart</h1>
-<div class="subtitle">Rotation around gravity axis · Scrolling over time</div>
+<div class="subtitle">Rotation around gravity axis · ECG-style scrolling</div>
 
 <div class="controls">
   <button class="btn btn-perm" id="permBtn" onclick="requestPermission()">Grant Sensors</button>
@@ -89,9 +97,15 @@
   </div>
 </div>
 
+<div class="debug-section">
+  <div class="debug-title">Debug</div>
+  <div class="debug-row"><span>Gravity unit (device)</span><span class="debug-val" id="dbGunit">--</span></div>
+  <div class="debug-row"><span>RotationRate (x,y,z)</span><span class="debug-val" id="dbGyro">--</span></div>
+  <div class="debug-row"><span>Projected yaw rate</span><span class="debug-val" id="dbProj">--</span></div>
+</div>
+
 <div id="status">Tap "Grant Sensors" to begin</div>
 
-<!-- Calibration overlay -->
 <div class="cal-overlay hidden" id="calOverlay">
   <div class="cal-icon">📐</div>
   <div class="cal-title">Calibrating Gravity Vector</div>
@@ -104,9 +118,8 @@
 // ============ CONFIG ============
 const CAL_DURATION = 3000;
 const CAL_MIN_SAMPLES = 50;
-const SAMPLE_INTERVAL = 100; // ms, one data point every 0.1s
-const CHART_SECONDS = 15;    // how many seconds visible on chart
-const Y_RANGE_INIT = 45;     // initial ±degrees range for Y axis
+const SAMPLE_INTERVAL = 100;
+const CHART_SECONDS = 15;
 const Y_RANGE_MIN = 10;
 const GRAV_LP = 0.97;
 
@@ -130,8 +143,8 @@ let yawAngle = 0;
 let yawRate = 0;
 let lastMotionTime = null;
 
-// Chart data: ring buffer of angle samples
-let data = [];        // array of {t, angle}
+// Chart data
+let data = [];
 let chartStartTime = 0;
 let sampleTimer = null;
 
@@ -153,6 +166,7 @@ window.addEventListener('resize', resizeCanvas);
 function handleMotion(e) {
   const now = performance.now();
 
+  // Update gravity estimate
   const agx = e.accelerationIncludingGravity?.x || 0;
   const agy = e.accelerationIncludingGravity?.y || 0;
   const agz = e.accelerationIncludingGravity?.z || 0;
@@ -180,18 +194,40 @@ function handleMotion(e) {
 
   if (!calibrated) return;
 
-  // Gyro: project rotationRate onto gravity axis
+  // ====== KEY: rotationRate axis definition ======
+  // The Web DeviceMotion API defines rotationRate as:
+  //   .alpha = rotation around device Z axis (perpendicular to screen)  °/s
+  //   .beta  = rotation around device X axis (horizontal, left-right)   °/s
+  //   .gamma = rotation around device Y axis (vertical, top-bottom)     °/s
+  //
+  // So the angular velocity vector in device frame is:
+  //   ω = (beta, gamma, alpha) = (ωx, ωy, ωz)
+  //
+  // To get rotation around gravity axis:
+  //   yaw_rate = ω · ĝ = ωx*ĝx + ωy*ĝy + ωz*ĝz
+
   const rr = e.rotationRate;
   if (!rr) return;
 
-  const wrx = rr.beta  || 0; // °/s around device X
-  const wry = rr.gamma || 0; // °/s around device Y
-  const wrz = rr.alpha || 0; // °/s around device Z
+  // Angular velocity in device frame (°/s)
+  const wx = rr.beta  || 0;  // around device X
+  const wy = rr.gamma || 0;  // around device Y
+  const wz = rr.alpha || 0;  // around device Z
 
-  const rawYawRate = wrx * gUnitX + wry * gUnitY + wrz * gUnitZ;
+  // Project onto gravity axis
+  const rawYawRate = wx * gUnitX + wy * gUnitY + wz * gUnitZ;
 
+  // Debug
+  document.getElementById('dbGunit').textContent =
+    `(${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)})`;
+  document.getElementById('dbGyro').textContent =
+    `(${wx.toFixed(1)}, ${wy.toFixed(1)}, ${wz.toFixed(1)})`;
+  document.getElementById('dbProj').textContent = rawYawRate.toFixed(2) + ' °/s';
+
+  // Smooth for display
   yawRate = yawRate * 0.7 + rawYawRate * 0.3;
 
+  // Integrate
   if (lastMotionTime !== null) {
     const dt = (now - lastMotionTime) / 1000;
     if (dt > 0 && dt < 0.5) {
@@ -204,18 +240,15 @@ function handleMotion(e) {
   document.getElementById('curRate').textContent = yawRate.toFixed(1) + ' °/s';
 }
 
-// ============ CHART SAMPLING ============
+// ============ CHART ============
 function startSampling() {
   chartStartTime = performance.now();
   data = [];
   sampleTimer = setInterval(() => {
     const t = (performance.now() - chartStartTime) / 1000;
     data.push({ t, angle: yawAngle });
-
-    // Keep only enough data for the visible window + a small buffer
     const maxSamples = Math.ceil(CHART_SECONDS / (SAMPLE_INTERVAL / 1000)) + 20;
     if (data.length > maxSamples) data.shift();
-
     drawChart();
   }, SAMPLE_INTERVAL);
 }
@@ -224,7 +257,6 @@ function stopSampling() {
   if (sampleTimer) { clearInterval(sampleTimer); sampleTimer = null; }
 }
 
-// ============ CHART DRAWING ============
 function drawChart() {
   const w = canvas.width / dpr;
   const h = canvas.height / dpr;
@@ -234,25 +266,20 @@ function drawChart() {
 
   ctx.clearRect(0, 0, w, h);
 
-  // Determine Y range (auto-scale)
-  let maxAbs = Y_RANGE_INIT;
-  for (const d of data) {
-    const a = Math.abs(d.angle);
-    if (a > maxAbs) maxAbs = a;
-  }
-  // Round up to nice number
+  // Y range auto-scale
+  let maxAbs = 45;
+  for (const d of data) { const a = Math.abs(d.angle); if (a > maxAbs) maxAbs = a; }
   const yRange = Math.max(Y_RANGE_MIN, Math.ceil(maxAbs / 10) * 10 + 5);
 
-  // Time range: latest CHART_SECONDS
+  // Time range
   const now = data.length > 0 ? data[data.length - 1].t : 0;
   const tMin = now - CHART_SECONDS;
   const tMax = now;
 
-  // Helpers
   function xPos(t) { return pad.left + ((t - tMin) / (tMax - tMin)) * cw; }
   function yPos(angle) { return pad.top + ch / 2 - (angle / yRange) * (ch / 2); }
 
-  // Background gradient
+  // Background
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
   grad.addColorStop(0, 'rgba(255,107,107,0.03)');
   grad.addColorStop(0.5, 'rgba(0,0,0,0)');
@@ -260,9 +287,8 @@ function drawChart() {
   ctx.fillStyle = grad;
   ctx.fillRect(pad.left, pad.top, cw, ch);
 
-  // Grid lines - horizontal
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 0.5;
+  // H grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
   const yStep = yRange <= 30 ? 10 : yRange <= 90 ? 15 : yRange <= 180 ? 30 : 45;
   for (let a = -yRange; a <= yRange; a += yStep) {
     const y = yPos(a);
@@ -271,16 +297,14 @@ function drawChart() {
   }
 
   // Zero line
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
   const zeroY = yPos(0);
   ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cw, zeroY); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Grid lines - vertical (time)
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 0.5;
+  // V grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
   const tStep = CHART_SECONDS <= 10 ? 1 : CHART_SECONDS <= 30 ? 2 : 5;
   const firstT = Math.ceil(tMin / tStep) * tStep;
   for (let t = firstT; t <= tMax; t += tStep) {
@@ -289,20 +313,17 @@ function drawChart() {
     ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ch); ctx.stroke();
   }
 
-  // Y axis labels
-  ctx.fillStyle = '#555';
-  ctx.font = '10px -apple-system, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
+  // Y labels
+  ctx.fillStyle = '#555'; ctx.font = '10px -apple-system,sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   for (let a = -yRange; a <= yRange; a += yStep) {
     const y = yPos(a);
     if (y < pad.top + 5 || y > pad.top + ch - 5) continue;
     ctx.fillText(a + '°', pad.left - 6, y);
   }
 
-  // X axis labels (time)
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
+  // X labels
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   for (let t = firstT; t <= tMax; t += tStep) {
     const x = xPos(t);
     if (x < pad.left + 10 || x > pad.left + cw - 10) continue;
@@ -310,93 +331,68 @@ function drawChart() {
   }
 
   // Axis titles
-  ctx.fillStyle = '#444';
-  ctx.font = '9px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
+  ctx.fillStyle = '#444'; ctx.font = '9px -apple-system,sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('Time', pad.left + cw / 2, h - 4);
-
   ctx.save();
   ctx.translate(10, pad.top + ch / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText('Angle (°)', 0, 0);
   ctx.restore();
 
-  // Draw data line
   if (data.length < 2) return;
 
-  // Clip to chart area
+  // Clip
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(pad.left, pad.top, cw, ch);
-  ctx.clip();
+  ctx.beginPath(); ctx.rect(pad.left, pad.top, cw, ch); ctx.clip();
 
-  // Filled area under curve
+  // Fill under curve
   ctx.beginPath();
   let started = false;
   for (const d of data) {
     if (d.t < tMin) continue;
-    const x = xPos(d.t);
-    const y = yPos(d.angle);
+    const x = xPos(d.t), y = yPos(d.angle);
     if (!started) { ctx.moveTo(x, zeroY); ctx.lineTo(x, y); started = true; }
     else ctx.lineTo(x, y);
   }
   if (started) {
-    const lastD = data[data.length - 1];
-    ctx.lineTo(xPos(lastD.t), zeroY);
+    ctx.lineTo(xPos(data[data.length - 1].t), zeroY);
     ctx.closePath();
-    const fillGrad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
-    fillGrad.addColorStop(0, 'rgba(126,184,255,0.15)');
-    fillGrad.addColorStop(0.5, 'rgba(126,184,255,0.02)');
-    fillGrad.addColorStop(1, 'rgba(126,184,255,0.15)');
-    ctx.fillStyle = fillGrad;
-    ctx.fill();
+    const fg = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+    fg.addColorStop(0, 'rgba(126,184,255,0.15)');
+    fg.addColorStop(0.5, 'rgba(126,184,255,0.02)');
+    fg.addColorStop(1, 'rgba(126,184,255,0.15)');
+    ctx.fillStyle = fg; ctx.fill();
   }
 
   // Line
-  ctx.beginPath();
-  started = false;
+  ctx.beginPath(); started = false;
   for (const d of data) {
     if (d.t < tMin) continue;
-    const x = xPos(d.t);
-    const y = yPos(d.angle);
-    if (!started) { ctx.moveTo(x, y); started = true; }
-    else ctx.lineTo(x, y);
+    const x = xPos(d.t), y = yPos(d.angle);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
   }
-  ctx.strokeStyle = '#7eb8ff';
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
+  ctx.strokeStyle = '#7eb8ff'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
 
-  // Current point dot
+  // Current dot
   if (data.length > 0) {
     const last = data[data.length - 1];
-    const lx = xPos(last.t);
-    const ly = yPos(last.angle);
-
-    // Glow
+    const lx = xPos(last.t), ly = yPos(last.angle);
     const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 12);
     glow.addColorStop(0, 'rgba(126,184,255,0.4)');
     glow.addColorStop(1, 'rgba(126,184,255,0)');
     ctx.fillStyle = glow;
     ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill();
-
-    // Dot
     ctx.fillStyle = '#7eb8ff';
     ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
-
-    // Value label
-    ctx.fillStyle = '#bbb';
-    ctx.font = 'bold 11px -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#bbb'; ctx.font = 'bold 11px -apple-system,sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(last.angle.toFixed(1) + '°', lx + 8, ly - 4);
   }
 
   ctx.restore();
 
   // Border
-  ctx.strokeStyle = '#1e1e40';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#1e1e40'; ctx.lineWidth = 1;
   ctx.strokeRect(pad.left, pad.top, cw, ch);
 }
 
@@ -422,7 +418,7 @@ function finishCalibration() {
   for (const s of calAccelSamples) { sx += s.x; sy += s.y; sz += s.z; }
   const n = calAccelSamples.length;
   const avgX = sx / n, avgY = sy / n, avgZ = sz / n;
-  const mag = Math.sqrt(avgX * avgX + avgY * avgY + avgZ * avgZ);
+  const mag = Math.sqrt(avgX*avgX + avgY*avgY + avgZ*avgZ);
 
   if (mag < 5) {
     document.getElementById('status').textContent = '❌ Gravity too weak. Try again.';
@@ -440,8 +436,12 @@ function finishCalibration() {
 
   calibrated = true;
   document.getElementById('resetBtn').style.display = '';
+
+  // Tell user what gravity axis looks like
+  // If phone is flat: gUnit ≈ (0, 0, ±1)
+  // If phone is upright: gUnit ≈ (0, ±1, 0)
   document.getElementById('status').textContent =
-    `✅ Calibrated! g = (${gUnitX.toFixed(3)}, ${gUnitY.toFixed(3)}, ${gUnitZ.toFixed(3)}). Rotate your phone!`;
+    `✅ Calibrated! Rotate phone in the plane perpendicular to gravity.`;
 
   startSampling();
 }
@@ -449,9 +449,7 @@ function finishCalibration() {
 function recalibrate() {
   stopSampling();
   calibrated = false;
-  yawAngle = 0;
-  yawRate = 0;
-  lastMotionTime = null;
+  yawAngle = 0; yawRate = 0; lastMotionTime = null;
   data = [];
   document.getElementById('curAngle').textContent = '0.0°';
   document.getElementById('curRate').textContent = '0.0 °/s';
@@ -468,9 +466,7 @@ function requestPermission() {
         else document.getElementById('status').textContent = '❌ Permission denied';
       })
       .catch(err => { document.getElementById('status').textContent = '❌ ' + err.message; });
-  } else {
-    onPermGranted();
-  }
+  } else { onPermGranted(); }
 }
 
 function onPermGranted() {
@@ -481,7 +477,6 @@ function onPermGranted() {
   startCalibration();
 }
 
-// Init
 resizeCanvas();
 drawChart();
 </script>
